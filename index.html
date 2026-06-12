@@ -31,7 +31,6 @@
         h3 { color: var(--text-main); font-size: 14pt; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
 
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; gap: 5px; }
         label { font-size: 10pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         input, select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 6px; outline: none; font-size: 10pt; transition: var(--transition); }
@@ -101,7 +100,7 @@
 <div class="container" id="main-content" style="display: none;">
     <header>
         <h1>COORDENAÇÃO DE CURSOS E TURMAS</h1>
-        <p style="color: var(--text-muted); margin: 5px 0 0 0; font-weight: 600;">Prefeitura de Iguaba Grande | Utilizador: <span id="user-profile-display" style="color: var(--primary);"></span></p>
+        <p style="color: var(--text-muted); margin: 5px 0 0 0; font-weight: 600;">Prefeitura de Iguaba Grande | Perfil: <span id="user-profile-display" style="color: var(--primary);"></span></p>
         <button class="btn btn-danger btn-sm" style="margin-top: 15px;" onclick="encerrarSessao()">Terminar Sessão</button>
     </header>
 
@@ -291,8 +290,6 @@
     }
 
     async function iniciarSistema() {
-        document.getElementById('user-profile-display').innerText = utilizadorAtual.email;
-        
         const { data: perfilData, error: perfilError } = await supa
             .from('perfis') 
             .select('nivel_acesso')
@@ -301,7 +298,21 @@
 
         if (perfilData) {
             nivelAcessoUsuario = perfilData.nivel_acesso;
+        } else {
+            alert("Perfil de acesso não configurado.");
+            await supa.auth.signOut();
+            return;
         }
+
+        // Bloqueio categórico para Alunos e Instrutor no módulo de Gestão de Cursos e Turmas
+        if (nivelAcessoUsuario === 'Alunos' || nivelAcessoUsuario === 'Instrutor') {
+            alert("Acesso negado: O seu perfil (" + nivelAcessoUsuario + ") não possui autorização para acessar o módulo de Gestão de Turmas.");
+            await supa.auth.signOut();
+            window.location.reload();
+            return;
+        }
+
+        document.getElementById('user-profile-display').innerText = nivelAcessoUsuario;
         
         document.body.classList.remove('admin-mode', 'operacional-mode');
         
@@ -440,7 +451,7 @@
 
         if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
 
-        alert("Turma updated com sucesso!");
+        alert("Turma atualizada com sucesso!");
         document.getElementById('form-editar-turma').style.display = 'none';
         idTurmaEdicao = null;
         await carregarDashboard();
