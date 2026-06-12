@@ -31,6 +31,7 @@
         h3 { color: var(--text-main); font-size: 14pt; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
 
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; gap: 5px; }
         label { font-size: 10pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         input, select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 6px; outline: none; font-size: 10pt; transition: var(--transition); }
@@ -74,6 +75,10 @@
         /* --- Restrição de Acesso --- */
         .admin-only { display: none !important; }
         body.admin-mode .admin-only { display: inline-flex !important; }
+
+        .operacional-only { display: none !important; }
+        body.admin-mode .operacional-only, body.operacional-mode .operacional-only { display: block !important; }
+        body.admin-mode .operacional-only.btn, body.operacional-mode .operacional-only.btn { display: inline-flex !important; }
     </style>
 </head>
 <body>
@@ -202,7 +207,7 @@
     <div class="card" id="painel-alunos-turma" style="display: none; border-left: 4px solid var(--secondary);">
         <h3 id="titulo-gerenciamento-alunos">👥 Alunos Vinculados</h3>
         
-        <div style="background-color: var(--bg-body); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+        <div class="operacional-only" style="background-color: var(--bg-body); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
             <label style="color: var(--secondary); font-weight: bold; margin-bottom: 8px;">Matricular Aluno Diretamente Nesta Turma</label>
             <div style="display: flex; gap: 10px;">
                 <input type="text" id="input-vinculo-aluno" list="lista-todos-alunos" placeholder="Busque o aluno por Nome ou CPF..." style="flex: 2;" oninput="aplicarMascaraBuscaTurma(this)">
@@ -265,6 +270,14 @@
         return true;
     }
 
+    function verificarPermissaoEscrita() {
+        if (nivelAcessoUsuario !== 'Admin' && nivelAcessoUsuario !== 'Operacional') {
+            alert("Acesso negado: Perfil sem permissões para realizar modificações.");
+            return false;
+        }
+        return true;
+    }
+
     async function realizarLogin() {
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-senha').value;
@@ -280,7 +293,6 @@
     async function iniciarSistema() {
         document.getElementById('user-profile-display').innerText = utilizadorAtual.email;
         
-        // Consulta direta na tabela 'perfis' utilizando o UUID do utilizador autenticado
         const { data: perfilData, error: perfilError } = await supa
             .from('perfis') 
             .select('nivel_acesso')
@@ -291,10 +303,12 @@
             nivelAcessoUsuario = perfilData.nivel_acesso;
         }
         
+        document.body.classList.remove('admin-mode', 'operacional-mode');
+        
         if (nivelAcessoUsuario === 'Admin') {
             document.body.classList.add('admin-mode');
-        } else {
-            document.body.classList.remove('admin-mode');
+        } else if (nivelAcessoUsuario === 'Operacional') {
+            document.body.classList.add('operacional-mode');
         }
 
         document.getElementById('login-screen').style.display = 'none';
@@ -467,12 +481,18 @@
             return;
         }
 
+        const temPermissaoMutacao = (nivelAcessoUsuario === 'Admin' || nivelAcessoUsuario === 'Operacional');
+
         data.forEach(aluno => {
+            const acaoHtml = temPermissaoMutacao 
+                ? `<button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:9pt;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>`
+                : `<span style="color:var(--text-muted); font-size:9pt;">Apenas Leitura</span>`;
+
             tbody.innerHTML += `<tr>
                 <td><strong>${aluno.nome}</strong></td>
                 <td>${aluno.cpf}</td>
                 <td style="text-align:center;">
-                    <button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:9pt;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>
+                    ${acaoHtml}
                 </td>
             </tr>`;
         });
@@ -480,6 +500,7 @@
 
     // Motor de busca robusto integrado com o Supabase
     async function vincularAlunoTurma() {
+        if (!verificarPermissaoEscrita()) return;
         const inputVal = document.getElementById('input-vinculo-aluno').value.trim();
         if(!inputVal) return alert("Selecione ou digite o nome/CPF do aluno.");
 
@@ -524,6 +545,7 @@
     }
 
     async function desvincularAlunoTurma(cpf) {
+        if (!verificarPermissaoEscrita()) return;
         if(!confirm("Deseja remover este aluno desta turma?")) return;
         
         const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
