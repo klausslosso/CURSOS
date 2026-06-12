@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Cursos e Turmas - CCP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* --- Variáveis Globais (Modo Escuro / Dark Mode) --- */
+        :root {
+            --bg-body: #0f172a; --bg-card: #1e293b; --bg-input: #334155;
+            --text-main: #f8fafc; --text-muted: #94a3b8; --primary: #3b82f6;
+            --primary-hover: #2563eb; --secondary: #10b981; --danger: #ef4444;
+            --warning: #f59e0b; --border: #334155; --transition: all 0.3s ease;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); margin: 0; line-height: 1.5; padding: 20px 15px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* --- Ecrã de Autenticação --- */
+        .login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-body); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .login-card { background: var(--bg-card); padding: 40px; border-radius: 12px; border: 1px solid var(--border); width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+
+        header { text-align: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
+        header h1 { margin: 0; font-size: 22pt; color: var(--primary); }
+
+        /* --- Painéis e Formulários --- */
+        .card { background: var(--bg-card); border-radius: 10px; padding: 25px; border: 1px solid var(--border); margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        h2 { font-size: 16pt; margin-top: 0; color: var(--primary); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        h3 { color: var(--text-main); font-size: 14pt; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 10pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        input, select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 6px; outline: none; font-size: 10pt; transition: var(--transition); }
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+        
+        /* --- Botões --- */
+        .btn { padding: 12px 15px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 10pt; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-secondary:hover { background: #0e9f6e; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-sm { padding: 6px 12px; font-size: 9pt; width: auto; }
+
+        /* --- Dashboard de Turmas --- */
+        .curso-block { background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .curso-header { font-size: 14pt; font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; }
+        
+        .turma-row { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .turma-info { display: flex; flex-direction: column; gap: 4px; }
+        .turma-nome { font-size: 12pt; font-weight: bold; color: var(--text-main); }
+        .turma-detalhes { font-size: 10pt; color: var(--text-muted); }
+        
+        .vagas-box { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .vagas-count { font-size: 14pt; font-weight: bold; }
+        .vagas-cheia { color: var(--danger); }
+        .vagas-disponiveis { color: var(--secondary); }
+        
+        .progress-bar { width: 150px; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--secondary); transition: width 0.5s ease; }
+        .progress-fill.full { background: var(--danger); }
+
+        /* --- Tabelas Administrativas --- */
+        .styled-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
+        .styled-table th { background: var(--bg-input); color: var(--primary); font-weight: bold; text-align: left; padding: 10px; border-bottom: 2px solid var(--border); }
+        .styled-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+    <div class="login-card">
+        <h2 style="border:none; justify-content:center; color: var(--primary); font-size: 18pt; margin-bottom: 20px; padding: 0;">SGE CCP - GESTÃO DE TURMAS</h2>
+        <div class="form-group" style="margin-bottom: 15px; text-align: left;">
+            <label>E-mail Institucional</label>
+            <input type="email" id="login-email" placeholder="coordenacao@iguaba.rj.gov.br">
+        </div>
+        <div class="form-group" style="margin-bottom: 20px; text-align: left;">
+            <label>Palavra-passe</label>
+            <input type="password" id="login-senha" placeholder="******">
+        </div>
+        <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="realizarLogin()">Aceder ao Sistema</button>
+    </div>
+</div>
+
+<div class="container" id="main-content" style="display: none;">
+    <header>
+        <h1>COORDENAÇÃO DE CURSOS E TURMAS</h1>
+        <p style="color: var(--text-muted); margin: 5px 0 0 0; font-weight: 600;">Prefeitura de Iguaba Grande | Utilizador: <span id="user-profile-display" style="color: var(--primary);"></span></p>
+        <button class="btn btn-danger btn-sm" style="margin-top: 15px;" onclick="encerrarSessao()">Terminar Sessão</button>
+    </header>
+
+    <div class="card" id="painel-admin">
+        <h2>Painel Administrativo 
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary btn-sm" onclick="toggleForm('form-curso')">+ Novo Curso</button>
+                <button class="btn btn-primary btn-sm" onclick="toggleForm('form-turma')">+ Nova Turma</button>
+            </div>
+        </h2>
+
+        <div id="form-curso" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
+            <h3>Cadastrar Novo Curso</h3>
+            <div class="form-grid" style="align-items: end;">
+                <div class="form-group" style="flex: 2;">
+                    <label>Nome Oficial do Curso</label>
+                    <input type="text" id="novo-curso-nome" placeholder="Ex: INFORMÁTICA BÁSICA">
+                </div>
+                <button class="btn btn-secondary" onclick="salvarCurso()">Gravar Curso</button>
+            </div>
+        </div>
+
+        <div id="form-turma" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
+            <h3>Abrir Nova Turma</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Vincular ao Curso</label>
+                    <select id="nova-turma-curso"><option value="">Aguarde...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Identificação da Turma</label>
+                    <input type="text" id="nova-turma-nome" placeholder="Ex: Turma 01">
+                </div>
+                <div class="form-group">
+                    <label>Dia da Semana</label>
+                    <select id="nova-turma-dia">
+                        <option value="Segunda">Segunda-feira</option><option value="Terça">Terça-feira</option>
+                        <option value="Quarta">Quarta-feira</option><option value="Quinta">Quinta-feira</option>
+                        <option value="Sexta">Sexta-feira</option><option value="Sábado">Sábado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Turno</label>
+                    <select id="nova-turma-turno">
+                        <option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Instrutor Responsável</label>
+                    <input type="text" id="nova-turma-instrutor" placeholder="Nome do Professor">
+                </div>
+                <div class="form-group">
+                    <label>Limite de Vagas</label>
+                    <input type="number" id="nova-turma-vagas" value="20" min="1">
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn btn-primary" onclick="salvarTurma()">Gravar Turma</button>
+            </div>
+        </div>
+
+        <div id="form-editar-turma" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
+            <h3 style="color: var(--warning);">✏️ Modificar Parâmetros da Turma</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Curso Vinculado</label>
+                    <input type="text" id="edit-turma-curso" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Identificação da Turma</label>
+                    <input type="text" id="edit-turma-nome">
+                </div>
+                <div class="form-group">
+                    <label>Dia da Semana</label>
+                    <select id="edit-turma-dia">
+                        <option value="Segunda">Segunda-feira</option><option value="Terça">Terça-feira</option>
+                        <option value="Quarta">Quarta-feira</option><option value="Quinta">Quinta-feira</option>
+                        <option value="Sexta">Sexta-feira</option><option value="Sábado">Sábado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Turno</label>
+                    <select id="edit-turma-turno">
+                        <option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Instrutor Responsável</label>
+                    <input type="text" id="edit-turma-instrutor">
+                </div>
+                <div class="form-group">
+                    <label>Limite de Vagas</label>
+                    <input type="number" id="edit-turma-vagas" min="1">
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-warning" onclick="atualizarTurma()">Atualizar Turma</button>
+                <button class="btn btn-danger btn-sm" onclick="document.getElementById('form-editar-turma').style.display='none'">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="painel-alunos-turma" style="display: none; border-left: 4px solid var(--secondary);">
+        <h3 id="titulo-gerenciamento-alunos">👥 Alunos Vinculados</h3>
+        
+        <div style="background-color: var(--bg-body); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <label style="color: var(--secondary); font-weight: bold; margin-bottom: 8px;">Matricular Aluno Diretamente Nesta Turma</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="input-vinculo-aluno" list="lista-todos-alunos" placeholder="Busque o aluno por Nome ou CPF..." style="flex: 2;" oninput="aplicarMascaraBuscaTurma(this)">
+                <datalist id="lista-todos-alunos"></datalist>
+                <button type="button" class="btn btn-secondary" onclick="vincularAlunoTurma()">Vincular Aluno</button>
+            </div>
+        </div>
+
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Nome do Aluno</th>
+                    <th>CPF</th>
+                    <th style="text-align: center; width: 120px;">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-alunos-matriculados"></tbody>
+        </table>
+        <div style="text-align: right; margin-top: 15px;">
+            <button class="btn btn-danger btn-sm" onclick="document.getElementById('painel-alunos-turma').style.display='none'">Fechar Painel de Alunos</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Dashboard de Lotação do CCP</h2>
+        <div id="dashboard-container" style="margin-top: 20px;">
+            <p style="text-align: center; color: var(--text-muted);">A carregar métricas da nuvem...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const supabaseUrl = 'https://qdmityjaqwvcesejsexh.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbWl0eWphcXd2Y2VzZWpzZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2ODU4NzAsImV4cCI6MjA5NDI2MTg3MH0.cqmB5B-lTaC1TaQwXuOlWjKjlnTufaGq6ndlm3K1uvI';
+    const supa = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    let utilizadorAtual = null;
+    let cursosMemoria = [];
+    let todosAlunosNuvem = [];
+    
+    let currentGerenciamentoCurso = "";
+    let currentGerenciamentoIdentificador = "";
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        try {
+            const { data: { session }, error } = await supa.auth.getSession();
+            if (session && !error) {
+                utilizadorAtual = session.user;
+                iniciarSistema();
+            }
+        } catch (err) { console.error("Erro na verificação da sessão."); }
+    });
+
+    async function realizarLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-senha').value;
+        if(!email || !password) { alert("Introduza os dados completos."); return; }
+
+        const { data, error } = await supa.auth.signInWithPassword({ email: email, password: password });
+        if(error) { alert("Acesso recusado: Verifique as suas credenciais."); return; }
+        
+        utilizadorAtual = data.user;
+        iniciarSistema();
+    }
+
+    async function iniciarSistema() {
+        document.getElementById('user-profile-display').innerText = utilizadorAtual.email;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        await carregarDashboard();
+        await baixarListaGlobalAlunos();
+    }
+
+    async function encerrarSessao() { await supa.auth.signOut(); window.location.reload(); }
+
+    function toggleForm(formId) {
+        const form = document.getElementById(formId);
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        if(formId === 'form-turma') atualizarSelectCursos();
+    }
+
+    // --- Motor de Busca e Datalist ---
+
+    // Máscara dinâmica para a barra de pesquisa
+    function aplicarMascaraBuscaTurma(input) {
+        let v = input.value;
+        if (/\d/.test(v)) { // Se contiver números, aplica a formatação de CPF
+            v = v.replace(/\D/g, "");
+            if (v.length > 11) v = v.substring(0, 11);
+            v = v.replace(/(\d{3})(\d)/, "$1.$2");
+            v = v.replace(/(\d{3})(\d)/, "$1.$2");
+            v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+            input.value = v;
+        }
+    }
+
+    // Formata o Datalist exatamente igual ao módulo de Matrículas (NOME - CPF)
+    async function baixarListaGlobalAlunos() {
+        const { data } = await supa.from('alunos_ccp').select('cpf, nome');
+        if (data) {
+            todosAlunosNuvem = data;
+            const dl = document.getElementById('lista-todos-alunos');
+            dl.innerHTML = '';
+            data.forEach(a => {
+                dl.innerHTML += `<option value="${a.nome} - ${a.cpf}"></option>`;
+            });
+        }
+    }
+
+    async function salvarCurso() {
+        const nome = document.getElementById('novo-curso-nome').value.trim().toUpperCase();
+        if(!nome) { alert("Indique o nome do curso."); return; }
+
+        const { error } = await supa.from('cursos').insert({ nome: nome, status: 'Ativo' });
+        if(error) { alert("Erro ao registar curso: " + error.message); return; }
+
+        document.getElementById('novo-curso-nome').value = '';
+        toggleForm('form-curso');
+        carregarDashboard();
+    }
+
+    async function salvarTurma() {
+        const curso = document.getElementById('nova-turma-curso').value;
+        const nomeTurma = document.getElementById('nova-turma-nome').value.trim();
+        const dia = document.getElementById('nova-turma-dia').value;
+        const turno = document.getElementById('nova-turma-turno').value;
+        const instrutor = document.getElementById('nova-turma-instrutor').value.trim();
+        const vagas = parseInt(document.getElementById('nova-turma-vagas').value);
+
+        if(!curso || !nomeTurma || !instrutor || !vagas) { alert("Preencha todos os campos da turma."); return; }
+
+        const identificador_formatado = `${nomeTurma} (${turno} - ${dia})`;
+
+        const payload = {
+            curso_nome: curso,
+            identificador: identificador_formatado,
+            dia_semana: dia,
+            turno: turno,
+            instrutor: instrutor,
+            vagas_limite: vagas,
+            status: 'Ativo'
+        };
+
+        const { error } = await supa.from('turmas').insert(payload);
+        if(error) { alert("Erro ao registar turma: " + error.message); return; }
+
+        toggleForm('form-turma');
+        carregarDashboard();
+    }
+
+    // --- Edição Cadastral da Turma ---
+    let idTurmaEdicao = null;
+    function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas) {
+        idTurmaEdicao = id;
+        document.getElementById('edit-turma-curso').value = curso;
+        document.getElementById('edit-turma-nome').value = identificador.split(' (')[0];
+        document.getElementById('edit-turma-dia').value = dia;
+        document.getElementById('edit-turma-turno').value = turno;
+        document.getElementById('edit-turma-instrutor').value = instrutor;
+        document.getElementById('edit-turma-vagas').value = vagas;
+        
+        document.getElementById('form-editar-turma').style.display = 'block';
+        document.getElementById('form-curso').style.display = 'none';
+        document.getElementById('form-turma').style.display = 'none';
+        document.getElementById('painel-alunos-turma').style.display = 'none';
+        window.scrollTo({ top: document.getElementById('form-editar-turma').offsetTop, behavior: 'smooth' });
+    }
+
+    async function atualizarTurma() {
+        if(!idTurmaEdicao) return;
+        const nomeTurma = document.getElementById('edit-turma-nome').value.trim();
+        const dia = document.getElementById('edit-turma-dia').value;
+        const turno = document.getElementById('edit-turma-turno').value;
+        const instrutor = document.getElementById('edit-turma-instrutor').value.trim();
+        const vagas = parseInt(document.getElementById('edit-turma-vagas').value);
+
+        if(!nomeTurma || !instrutor || !vagas) { alert("Preencha todos os campos."); return; }
+
+        const novoIdentificador = `${nomeTurma} (${turno} - ${dia})`;
+
+        const { error } = await supa.from('turmas').update({
+            identificador: novoIdentificador,
+            dia_semana: dia,
+            turno: turno,
+            instrutor: instrutor,
+            vagas_limite: vagas
+        }).eq('id', idTurmaEdicao);
+
+        if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
+
+        alert("Turma atualizada com sucesso!");
+        document.getElementById('form-editar-turma').style.display = 'none';
+        idTurmaEdicao = null;
+        await carregarDashboard();
+    }
+
+    async function alterarStatusTurma(id, novoStatus) {
+        if(!confirm(`Confirma a alteração do status da turma para '${novoStatus}'?`)) return;
+        await supa.from('turmas').update({ status: novoStatus }).eq('id', id);
+        carregarDashboard();
+    }
+
+    // --- Painel Dinâmico de Alunos (Vincular e Desvincular) ---
+    async function gerenciarAlunosTurma(cursoNome, identificadorTurma) {
+        currentGerenciamentoCurso = cursoNome;
+        currentGerenciamentoIdentificador = identificadorTurma;
+        
+        document.getElementById('titulo-gerenciamento-alunos').innerText = `👥 Alunos em: ${cursoNome} [${identificadorTurma}]`;
+        document.getElementById('painel-alunos-turma').style.display = 'block';
+        document.getElementById('form-editar-turma').style.display = 'none';
+        
+        await carregarAlunosDaTurma();
+        window.scrollTo({ top: document.getElementById('painel-alunos-turma').offsetTop, behavior: 'smooth' });
+    }
+
+    async function carregarAlunosDaTurma() {
+        const tbody = document.getElementById('tbody-alunos-matriculados');
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">A pesquisar matriculados...</td></tr>';
+        
+        const stringBusca = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        const { data, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').like('cursos', `%${stringBusca}%`);
+        
+        if(error) { tbody.innerHTML = '<tr><td colspan="3">Erro ao buscar alunos.</td></tr>'; return; }
+        
+        tbody.innerHTML = '';
+        if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nenhum aluno vinculado a esta turma.</td></tr>';
+            return;
+        }
+
+        data.forEach(aluno => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${aluno.nome}</strong></td>
+                <td>${aluno.cpf}</td>
+                <td style="text-align:center;">
+                    <button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:9pt;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    // Motor de busca robusto integrado com o Supabase
+    async function vincularAlunoTurma() {
+        const inputVal = document.getElementById('input-vinculo-aluno').value.trim();
+        if(!inputVal) return alert("Selecione ou digite o nome/CPF do aluno.");
+
+        let cpfBusca = "";
+        
+        // Verifica se a seleção veio do datalist (formato: NOME - CPF)
+        if(inputVal.includes(" - ")) {
+            cpfBusca = inputVal.split(" - ")[1].trim();
+        } else {
+            // Trata a digitação manual (CPF ou Nome)
+            let cpfLimpo = inputVal.replace(/\D/g, "");
+            if(cpfLimpo.length === 11) {
+                cpfBusca = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+            } else {
+                // Tenta cruzar pelo nome exato no cache global
+                let achado = todosAlunosNuvem.find(a => a.nome.toLowerCase() === inputVal.toLowerCase());
+                if(achado) cpfBusca = achado.cpf;
+            }
+        }
+
+        if(!cpfBusca) return alert("Não foi possível identificar o CPF do aluno. Selecione-o na lista suspensa.");
+
+        // Consulta transacional diretamente na base de dados para garantir que o aluno existe
+        const { data: aluno, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').eq('cpf', cpfBusca).single();
+        if(error || !aluno) return alert("Aluno não localizado no banco de dados da nuvem.");
+
+        const stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        let cursosAtuais = aluno.cursos ? aluno.cursos.trim() : "";
+        
+        if (cursosAtuais.includes(stringTurma)) return alert("O aluno " + aluno.nome + " já se encontra vinculado a esta turma.");
+
+        // Anexa a nova turma respeitando as matrículas anteriores do aluno
+        cursosAtuais = (cursosAtuais === "") ? stringTurma : `${cursosAtuais} | ${stringTurma}`;
+
+        // Executa a atualização do cadastro do aluno
+        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: cursosAtuais }).eq('cpf', aluno.cpf);
+        if(updError) return alert("Falha na vinculação no Supabase: " + updError.message);
+
+        document.getElementById('input-vinculo-aluno').value = '';
+        await carregarAlunosDaTurma(); // Atualiza a lista nominal na ecrã
+        await carregarDashboard(); // Atualiza a barra de progresso de vagas
+    }
+
+    async function desvincularAlunoTurma(cpf) {
+        if(!confirm("Deseja remover este aluno desta turma?")) return;
+        
+        const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
+        if(error || !aluno) return alert("Erro ao localizar cadastro.");
+
+        const stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
+        
+        cursosArray = cursosArray.filter(c => c !== stringTurma);
+        const novosCursos = cursosArray.join(' | ');
+
+        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
+        if(updError) return alert("Falha ao desvincular: " + updError.message);
+
+        await carregarAlunosDaTurma();
+        await carregarDashboard();
+    }
+
+    // --- Renderização do Dashboard ---
+    async function atualizarSelectCursos() {
+        const select = document.getElementById('nova-turma-curso');
+        select.innerHTML = '<option value="">Selecione o Curso...</option>';
+        cursosMemoria.forEach(c => { select.innerHTML += `<option value="${c.nome}">${c.nome}</option>`; });
+    }
+
+    async function carregarDashboard() {
+        const container = document.getElementById('dashboard-container');
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">A processar métricas...</p>';
+
+        const [resCursos, resTurmas, resAlunos] = await Promise.all([
+            supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
+            supa.from('turmas').select('*').eq('status', 'Ativo').order('curso_nome'),
+            supa.from('alunos_ccp').select('cursos')
+        ]);
+
+        if (resCursos.error || resTurmas.error || resAlunos.error) {
+            container.innerHTML = '<p style="color: var(--danger);">Falha de comunicação com a base de dados.</p>';
+            return;
+        }
+
+        cursosMemoria = resCursos.data;
+        const turmas = resTurmas.data;
+        const alunos = resAlunos.data;
+
+        let htmlFinal = '';
+
+        if(cursosMemoria.length === 0) {
+            htmlFinal = '<p style="text-align: center; color: var(--text-muted);">Nenhum curso ativo localizado.</p>';
+        }
+
+        cursosMemoria.forEach(curso => {
+            const turmasDoCurso = turmas.filter(t => t.curso_nome === curso.nome);
+            
+            htmlFinal += `
+            <div class="curso-block">
+                <div class="curso-header">
+                    <span>📚 ${curso.nome}</span>
+                    <span style="font-size: 11pt; color: var(--text-muted); font-weight: normal;">${turmasDoCurso.length} Turma(s)</span>
+                </div>`;
+
+            if(turmasDoCurso.length === 0) {
+                htmlFinal += `<p style="font-size: 10pt; color: var(--text-muted); margin: 0;">Sem turmas ativas no momento.</p>`;
+            } else {
+                turmasDoCurso.forEach(turma => {
+                    const stringBuscaMatricula = `${curso.nome} [${turma.identificador}]`;
+                    let contagemMatriculados = 0;
+
+                    alunos.forEach(aluno => {
+                        if (aluno.cursos && aluno.cursos.includes(stringBuscaMatricula)) contagemMatriculados++;
+                    });
+
+                    const taxaOcupacao = (contagemMatriculados / turma.vagas_limite) * 100;
+                    const classeVagas = contagemMatriculados >= turma.vagas_limite ? 'vagas-cheia' : 'vagas-disponiveis';
+                    const preenchimento = taxaOcupacao > 100 ? 100 : taxaOcupacao;
+
+                    htmlFinal += `
+                    <div class="turma-row">
+                        <div class="turma-info">
+                            <span class="turma-nome">${turma.identificador}</span>
+                            <span class="turma-detalhes">Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}</span>
+                            <div style="margin-top: 8px; display:flex; gap:6px;">
+                                <button class="btn btn-secondary btn-sm" style="background:#23324c;" onclick="gerenciarAlunosTurma('${curso.nome}', '${turma.identificador}')">👥 Alunos</button>
+                                <button class="btn btn-warning btn-sm" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite})">✏️ Editar</button>
+                                <button class="btn btn-danger btn-sm" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
+                            </div>
+                        </div>
+                        <div class="vagas-box">
+                            <span class="vagas-count ${classeVagas}">${contagemMatriculados} / ${turma.vagas_limite}</span>
+                            <span style="font-size: 9pt; color: var(--text-muted);">Vagas Ocupadas</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${contagemMatriculados >= turma.vagas_limite ? 'full' : ''}" style="width: ${preenchimento}%;"></div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            }
+            htmlFinal += `</div>`;
+        });
+
+        container.innerHTML = htmlFinal;
+    }
+</script>
+</body>
+</html>
