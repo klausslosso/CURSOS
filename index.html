@@ -70,6 +70,10 @@
         .styled-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
         .styled-table th { background: var(--bg-input); color: var(--primary); font-weight: bold; text-align: left; padding: 10px; border-bottom: 2px solid var(--border); }
         .styled-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+
+        /* --- Restrição de Acesso --- */
+        .admin-only { display: none !important; }
+        body.admin-mode .admin-only { display: inline-flex !important; }
     </style>
 </head>
 <body>
@@ -99,8 +103,8 @@
     <div class="card" id="painel-admin">
         <h2>Painel Administrativo 
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary btn-sm" onclick="toggleForm('form-curso')">+ Novo Curso</button>
-                <button class="btn btn-primary btn-sm" onclick="toggleForm('form-turma')">+ Nova Turma</button>
+                <button class="btn btn-secondary btn-sm admin-only" onclick="toggleForm('form-curso')">+ Novo Curso</button>
+                <button class="btn btn-primary btn-sm admin-only" onclick="toggleForm('form-turma')">+ Nova Turma</button>
             </div>
         </h2>
 
@@ -236,6 +240,7 @@
     const supa = window.supabase.createClient(supabaseUrl, supabaseKey);
 
     let utilizadorAtual = null;
+    let nivelAcessoUsuario = null; 
     let cursosMemoria = [];
     let todosAlunosNuvem = [];
     
@@ -252,6 +257,14 @@
         } catch (err) { console.error("Erro na verificação da sessão."); }
     });
 
+    function verificarPermissaoAdmin() {
+        if (nivelAcessoUsuario !== 'Admin') {
+            alert("Acesso negado: Ação restrita ao perfil de administrador.");
+            return false;
+        }
+        return true;
+    }
+
     async function realizarLogin() {
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-senha').value;
@@ -266,6 +279,24 @@
 
     async function iniciarSistema() {
         document.getElementById('user-profile-display').innerText = utilizadorAtual.email;
+        
+        // Consulta direta na tabela 'perfis' utilizando o UUID do utilizador autenticado
+        const { data: perfilData, error: perfilError } = await supa
+            .from('perfis') 
+            .select('nivel_acesso')
+            .eq('id', utilizadorAtual.id)
+            .single();
+
+        if (perfilData) {
+            nivelAcessoUsuario = perfilData.nivel_acesso;
+        }
+        
+        if (nivelAcessoUsuario === 'Admin') {
+            document.body.classList.add('admin-mode');
+        } else {
+            document.body.classList.remove('admin-mode');
+        }
+
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
         await carregarDashboard();
@@ -275,6 +306,8 @@
     async function encerrarSessao() { await supa.auth.signOut(); window.location.reload(); }
 
     function toggleForm(formId) {
+        if ((formId === 'form-curso' || formId === 'form-turma') && !verificarPermissaoAdmin()) return;
+        
         const form = document.getElementById(formId);
         form.style.display = form.style.display === 'none' ? 'block' : 'none';
         if(formId === 'form-turma') atualizarSelectCursos();
@@ -309,6 +342,7 @@
     }
 
     async function salvarCurso() {
+        if (!verificarPermissaoAdmin()) return;
         const nome = document.getElementById('novo-curso-nome').value.trim().toUpperCase();
         if(!nome) { alert("Indique o nome do curso."); return; }
 
@@ -321,6 +355,7 @@
     }
 
     async function salvarTurma() {
+        if (!verificarPermissaoAdmin()) return;
         const curso = document.getElementById('nova-turma-curso').value;
         const nomeTurma = document.getElementById('nova-turma-nome').value.trim();
         const dia = document.getElementById('nova-turma-dia').value;
@@ -352,6 +387,7 @@
     // --- Edição Cadastral da Turma ---
     let idTurmaEdicao = null;
     function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas) {
+        if (!verificarPermissaoAdmin()) return;
         idTurmaEdicao = id;
         document.getElementById('edit-turma-curso').value = curso;
         document.getElementById('edit-turma-nome').value = identificador.split(' (')[0];
@@ -368,6 +404,7 @@
     }
 
     async function atualizarTurma() {
+        if (!verificarPermissaoAdmin()) return;
         if(!idTurmaEdicao) return;
         const nomeTurma = document.getElementById('edit-turma-nome').value.trim();
         const dia = document.getElementById('edit-turma-dia').value;
@@ -389,13 +426,14 @@
 
         if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
 
-        alert("Turma atualizada com sucesso!");
+        alert("Turma updated com sucesso!");
         document.getElementById('form-editar-turma').style.display = 'none';
         idTurmaEdicao = null;
         await carregarDashboard();
     }
 
     async function alterarStatusTurma(id, novoStatus) {
+        if (!verificarPermissaoAdmin()) return;
         if(!confirm(`Confirma a alteração do status da turma para '${novoStatus}'?`)) return;
         await supa.from('turmas').update({ status: novoStatus }).eq('id', id);
         carregarDashboard();
@@ -569,8 +607,8 @@
                             <div style="margin-top: 8px; display:flex; gap:6px;">
                                 <button class="btn btn-secondary btn-sm" style="background:#23324c;" onclick="gerenciarAlunosTurma('${curso.nome}', '${turma.identificador}')">👥 Alunos</button>
                                 <button class="btn btn-secondary btn-sm" style="background:#4b5563;" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir</button>
-                                <button class="btn btn-warning btn-sm" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite})">✏️ Editar</button>
-                                <button class="btn btn-danger btn-sm" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
+                                <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite})">✏️ Editar</button>
+                                <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
                             </div>
                         </div>
                         <div class="vagas-box">
