@@ -150,7 +150,9 @@
                 </div>
                 <div class="form-group">
                     <label>Instrutor Responsável</label>
-                    <input type="text" id="nova-turma-instrutor" placeholder="Nome do Professor">
+                    <select id="nova-turma-instrutor">
+                        <option value="">Aguarde...</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Limite de Vagas</label>
@@ -189,7 +191,9 @@
                 </div>
                 <div class="form-group">
                     <label>Instrutor Responsável</label>
-                    <input type="text" id="edit-turma-instrutor">
+                    <select id="edit-turma-instrutor">
+                        <option value="">Aguarde...</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Limite de Vagas</label>
@@ -247,6 +251,7 @@
     let nivelAcessoUsuario = null; 
     let cursosMemoria = [];
     let todosAlunosNuvem = [];
+    let instrutoresMemoria = [];
     
     let currentGerenciamentoCurso = "";
     let currentGerenciamentoIdentificador = "";
@@ -304,7 +309,6 @@
             return;
         }
 
-        // Bloqueio categórico para Alunos e Instrutor no módulo de Gestão de Cursos e Turmas
         if (nivelAcessoUsuario === 'Alunos' || nivelAcessoUsuario === 'Instrutor') {
             alert("Acesso negado: O seu perfil (" + nivelAcessoUsuario + ") não possui autorização para acessar o módulo de Gestão de Turmas.");
             await supa.auth.signOut();
@@ -338,12 +342,9 @@
         if(formId === 'form-turma') atualizarSelectCursos();
     }
 
-    // --- Motor de Busca e Datalist ---
-
-    // Máscara dinâmica para a barra de pesquisa
     function aplicarMascaraBuscaTurma(input) {
         let v = input.value;
-        if (/\d/.test(v)) { // Se contiver números, aplica a formatação de CPF
+        if (/\d/.test(v)) { 
             v = v.replace(/\D/g, "");
             if (v.length > 11) v = v.substring(0, 11);
             v = v.replace(/(\d{3})(\d)/, "$1.$2");
@@ -353,7 +354,6 @@
         }
     }
 
-    // Formata o Datalist exatamente igual ao módulo de Matrículas (NOME - CPF)
     async function baixarListaGlobalAlunos() {
         const { data } = await supa.from('alunos_ccp').select('cpf, nome');
         if (data) {
@@ -409,7 +409,6 @@
         carregarDashboard();
     }
 
-    // --- Edição Cadastral da Turma ---
     let idTurmaEdicao = null;
     function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas) {
         if (!verificarPermissaoAdmin()) return;
@@ -464,7 +463,6 @@
         carregarDashboard();
     }
 
-    // --- Painel Dinâmico de Alunos (Vincular e Desvincular) ---
     async function gerenciarAlunosTurma(cursoNome, identificadorTurma) {
         currentGerenciamentoCurso = cursoNome;
         currentGerenciamentoIdentificador = identificadorTurma;
@@ -509,7 +507,6 @@
         });
     }
 
-    // Motor de busca robusto integrado com o Supabase
     async function vincularAlunoTurma() {
         if (!verificarPermissaoEscrita()) return;
         const inputVal = document.getElementById('input-vinculo-aluno').value.trim();
@@ -517,16 +514,13 @@
 
         let cpfBusca = "";
         
-        // Verifica se a seleção veio do datalist (formato: NOME - CPF)
         if(inputVal.includes(" - ")) {
             cpfBusca = inputVal.split(" - ")[1].trim();
         } else {
-            // Trata a digitação manual (CPF ou Nome)
             let cpfLimpo = inputVal.replace(/\D/g, "");
             if(cpfLimpo.length === 11) {
                 cpfBusca = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
             } else {
-                // Tenta cruzar pelo nome exato no cache global
                 let achado = todosAlunosNuvem.find(a => a.nome.toLowerCase() === inputVal.toLowerCase());
                 if(achado) cpfBusca = achado.cpf;
             }
@@ -534,7 +528,6 @@
 
         if(!cpfBusca) return alert("Não foi possível identificar o CPF do aluno. Selecione-o na lista suspensa.");
 
-        // Consulta transacional diretamente na base de dados para garantir que o aluno existe
         const { data: aluno, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').eq('cpf', cpfBusca).single();
         if(error || !aluno) return alert("Aluno não localizado no banco de dados da nuvem.");
 
@@ -543,16 +536,14 @@
         
         if (cursosAtuais.includes(stringTurma)) return alert("O aluno " + aluno.nome + " já se encontra vinculado a esta turma.");
 
-        // Anexa a nova turma respeitando as matrículas anteriores do aluno
         cursosAtuais = (cursosAtuais === "") ? stringTurma : `${cursosAtuais} | ${stringTurma}`;
 
-        // Executa a atualização do cadastro do aluno
         const { error: updError } = await supa.from('alunos_ccp').update({ cursos: cursosAtuais }).eq('cpf', aluno.cpf);
         if(updError) return alert("Falha na vinculação no Supabase: " + updError.message);
 
         document.getElementById('input-vinculo-aluno').value = '';
-        await carregarAlunosDaTurma(); // Atualiza a lista nominal na ecrã
-        await carregarDashboard(); // Atualiza a barra de progresso de vagas
+        await carregarAlunosDaTurma(); 
+        await carregarDashboard(); 
     }
 
     async function desvincularAlunoTurma(cpf) {
@@ -575,21 +566,38 @@
         await carregarDashboard();
     }
 
-    // --- Renderização do Dashboard ---
     async function atualizarSelectCursos() {
         const select = document.getElementById('nova-turma-curso');
         select.innerHTML = '<option value="">Selecione o Curso...</option>';
         cursosMemoria.forEach(c => { select.innerHTML += `<option value="${c.nome}">${c.nome}</option>`; });
     }
 
+    function atualizarSelectInstrutores() {
+        const selectNovo = document.getElementById('nova-turma-instrutor');
+        const selectEdit = document.getElementById('edit-turma-instrutor');
+        
+        let options = '<option value="">Selecione o Instrutor...</option>';
+        if (instrutoresMemoria && instrutoresMemoria.length > 0) {
+            instrutoresMemoria.forEach(inst => {
+                options += `<option value="${inst.nome}">${inst.nome}</option>`;
+            });
+        } else {
+            options = '<option value="">Nenhum instrutor cadastrado</option>';
+        }
+
+        if (selectNovo) selectNovo.innerHTML = options;
+        if (selectEdit) selectEdit.innerHTML = options;
+    }
+
     async function carregarDashboard() {
         const container = document.getElementById('dashboard-container');
         container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">A processar métricas...</p>';
 
-        const [resCursos, resTurmas, resAlunos] = await Promise.all([
+        const [resCursos, resTurmas, resAlunos, resInstrutores] = await Promise.all([
             supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
             supa.from('turmas').select('*').eq('status', 'Ativo').order('curso_nome'),
-            supa.from('alunos_ccp').select('cursos')
+            supa.from('alunos_ccp').select('cursos'),
+            supa.from('instrutores').select('id, nome').order('nome')
         ]);
 
         if (resCursos.error || resTurmas.error || resAlunos.error) {
@@ -598,6 +606,10 @@
         }
 
         cursosMemoria = resCursos.data;
+        instrutoresMemoria = resInstrutores.data || [];
+        
+        atualizarSelectInstrutores();
+
         const turmas = resTurmas.data;
         const alunos = resAlunos.data;
 
@@ -660,11 +672,9 @@
         container.innerHTML = htmlFinal;
     }
 
-    // --- Módulo de Impressão de Documentos (Diário e Planejamento) ---
     async function imprimirDiario(cursoNome, identificadorTurma, instrutor, turno, dia) {
         const stringBusca = `${cursoNome} [${identificadorTurma}]`;
         
-        // Busca os alunos matriculados nesta turma específica
         const { data: alunos, error } = await supa.from('alunos_ccp')
             .select('nome, cursos')
             .like('cursos', `%${stringBusca}%`)
@@ -672,7 +682,6 @@
 
         let listaAlunosHtml = '';
         if (!error && alunos && alunos.length > 0) {
-            // Refinamento em memória para evitar falsos positivos do LIKE
             const alunosFiltrados = alunos.filter(a => a.cursos && a.cursos.includes(stringBusca));
             
             alunosFiltrados.forEach((aluno, index) => {
@@ -684,7 +693,6 @@
                 </tr>`;
             });
             
-            // Preenche linhas em branco caso a turma tenha poucos alunos
             for (let i = alunosFiltrados.length; i < 20; i++) {
                 listaAlunosHtml += `
                 <tr>
@@ -701,12 +709,10 @@
         const mesAno = `${String(dataAtual.getMonth() + 1).padStart(2, '0')}/${dataAtual.getFullYear()}`;
         const nomeTurmaLimpo = identificadorTurma.split(' (')[0];
 
-        // Resolve o caminho absoluto da imagem para o contexto da nova aba de impressão
         const caminhoCenario = window.location.href.split('?')[0].split('#')[0];
         const caminhoBase = caminhoCenario.substring(0, caminhoCenario.lastIndexOf('/') + 1);
         const urlLogo = caminhoBase + 'image_773d3e.png';
 
-        // Construção do layout de impressão em nova janela
         const printWindow = window.open('', '_blank');
         const htmlContent = `
         <!DOCTYPE html>
@@ -811,7 +817,6 @@
             </table>
 
             <script>
-                // Aciona a impressão nativa assim que o DOM da nova janela for carregado
                 window.onload = function() { 
                     setTimeout(() => { window.print(); }, 500); 
                 }
