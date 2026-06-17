@@ -224,7 +224,7 @@
                 <tr>
                     <th>Nome do Aluno</th>
                     <th>CPF</th>
-                    <th style="text-align: center; width: 120px;">Ações</th>
+                    <th style="text-align: center; width: 160px;">Ações</th>
                 </tr>
             </thead>
             <tbody id="tbody-alunos-matriculados"></tbody>
@@ -493,18 +493,51 @@
         const temPermissaoMutacao = (nivelAcessoUsuario === 'Admin' || nivelAcessoUsuario === 'Operacional');
 
         data.forEach(aluno => {
+            const cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
+            const isInativo = cursosArray.includes(`${stringBusca} (INATIVO)`);
+            const badgeInativo = isInativo ? ` <span style="color:var(--danger); font-size:9pt; font-weight:bold;">(Desistente)</span>` : '';
+
             const acaoHtml = temPermissaoMutacao 
-                ? `<button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:9pt;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>`
+                ? `<button class="btn btn-warning btn-sm" style="padding:2px 8px; font-size:9pt; margin-right:4px;" onclick="alternarStatusAlunoTurma('${aluno.cpf}', ${isInativo})">${isInativo ? 'Ativar' : 'Inativar'}</button>
+                   <button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:9pt;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>`
                 : `<span style="color:var(--text-muted); font-size:9pt;">Apenas Leitura</span>`;
 
             tbody.innerHTML += `<tr>
-                <td><strong>${aluno.nome}</strong></td>
+                <td><strong>${aluno.nome}</strong>${badgeInativo}</td>
                 <td>${aluno.cpf}</td>
-                <td style="text-align:center;">
+                <td style="text-align:center; white-space:nowrap;">
                     ${acaoHtml}
                 </td>
             </tr>`;
         });
+    }
+
+    async function alternarStatusAlunoTurma(cpf, isInativo) {
+        if (!verificarPermissaoEscrita()) return;
+        const acaoMsg = isInativo ? "reativar" : "inativar (marcar como desistente)";
+        if(!confirm(`Confirma que deseja ${acaoMsg} o vínculo deste aluno com a turma?`)) return;
+        
+        const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
+        if(error || !aluno) return alert("Erro ao localizar cadastro.");
+
+        const stringTurmaBase = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        const stringTurmaInativa = `${stringTurmaBase} (INATIVO)`;
+        
+        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
+        
+        if (isInativo) {
+            cursosArray = cursosArray.map(c => c === stringTurmaInativa ? stringTurmaBase : c);
+        } else {
+            cursosArray = cursosArray.map(c => c === stringTurmaBase ? stringTurmaInativa : c);
+        }
+        
+        const novosCursos = cursosArray.join(' | ');
+
+        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
+        if(updError) return alert("Falha ao atualizar status: " + updError.message);
+
+        await carregarAlunosDaTurma();
+        await carregarDashboard();
     }
 
     async function vincularAlunoTurma() {
@@ -532,10 +565,13 @@
         if(error || !aluno) return alert("Aluno não localizado no banco de dados da nuvem.");
 
         const stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
-        let cursosAtuais = aluno.cursos ? aluno.cursos.trim() : "";
+        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
         
-        if (cursosAtuais.includes(stringTurma)) return alert("O aluno " + aluno.nome + " já se encontra vinculado a esta turma.");
+        if (cursosArray.includes(stringTurma) || cursosArray.includes(`${stringTurma} (INATIVO)`)) {
+            return alert("O aluno " + aluno.nome + " já possui vínculo com esta turma.");
+        }
 
+        let cursosAtuais = aluno.cursos ? aluno.cursos.trim() : "";
         cursosAtuais = (cursosAtuais === "") ? stringTurma : `${cursosAtuais} | ${stringTurma}`;
 
         const { error: updError } = await supa.from('alunos_ccp').update({ cursos: cursosAtuais }).eq('cpf', aluno.cpf);
@@ -553,10 +589,11 @@
         const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
         if(error || !aluno) return alert("Erro ao localizar cadastro.");
 
-        const stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        const stringTurmaBase = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        const stringTurmaInativa = `${stringTurmaBase} (INATIVO)`;
         let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
         
-        cursosArray = cursosArray.filter(c => c !== stringTurma);
+        cursosArray = cursosArray.filter(c => c !== stringTurmaBase && c !== stringTurmaInativa);
         const novosCursos = cursosArray.join(' | ');
 
         const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
@@ -637,7 +674,10 @@
                     let contagemMatriculados = 0;
 
                     alunos.forEach(aluno => {
-                        if (aluno.cursos && aluno.cursos.includes(stringBuscaMatricula)) contagemMatriculados++;
+                        if (aluno.cursos) {
+                            const cursosAluno = aluno.cursos.split(' | ').map(c => c.trim());
+                            if (cursosAluno.includes(stringBuscaMatricula)) contagemMatriculados++;
+                        }
                     });
 
                     const taxaOcupacao = (contagemMatriculados / turma.vagas_limite) * 100;
@@ -682,7 +722,11 @@
 
         let listaAlunosHtml = '';
         if (!error && alunos && alunos.length > 0) {
-            const alunosFiltrados = alunos.filter(a => a.cursos && a.cursos.includes(stringBusca));
+            const alunosFiltrados = alunos.filter(a => {
+                if (!a.cursos) return false;
+                const cursosArr = a.cursos.split(' | ').map(c => c.trim());
+                return cursosArr.includes(stringBusca);
+            });
             
             alunosFiltrados.forEach((aluno, index) => {
                 listaAlunosHtml += `
