@@ -158,6 +158,14 @@
                     <label>Limite de Vagas</label>
                     <input type="number" id="nova-turma-vagas" value="20" min="1">
                 </div>
+                <div class="form-group">
+                    <label>Data de Início</label>
+                    <input type="date" id="nova-turma-inicio">
+                </div>
+                <div class="form-group">
+                    <label>Data de Término</label>
+                    <input type="date" id="nova-turma-fim">
+                </div>
             </div>
             <div style="margin-top: 15px; text-align: right;">
                 <button class="btn btn-primary" onclick="salvarTurma()">Gravar Turma</button>
@@ -198,6 +206,14 @@
                 <div class="form-group">
                     <label>Limite de Vagas</label>
                     <input type="number" id="edit-turma-vagas" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Data de Início</label>
+                    <input type="date" id="edit-turma-inicio">
+                </div>
+                <div class="form-group">
+                    <label>Data de Término</label>
+                    <input type="date" id="edit-turma-fim">
                 </div>
             </div>
             <div style="margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
@@ -387,8 +403,10 @@
         const turno = document.getElementById('nova-turma-turno').value;
         const instrutor = document.getElementById('nova-turma-instrutor').value.trim();
         const vagas = parseInt(document.getElementById('nova-turma-vagas').value);
+        const dataInicio = document.getElementById('nova-turma-inicio').value;
+        const dataFim = document.getElementById('nova-turma-fim').value;
 
-        if(!curso || !nomeTurma || !instrutor || !vagas) { alert("Preencha todos os campos da turma."); return; }
+        if(!curso || !nomeTurma || !instrutor || !vagas || !dataInicio || !dataFim) { alert("Preencha todos os campos da turma, incluindo o período de início e fim."); return; }
 
         const identificador_formatado = `${nomeTurma} (${turno} - ${dia})`;
 
@@ -399,6 +417,8 @@
             turno: turno,
             instrutor: instrutor,
             vagas_limite: vagas,
+            data_inicio: dataInicio,
+            data_fim: dataFim,
             status: 'Ativo'
         };
 
@@ -410,7 +430,7 @@
     }
 
     let idTurmaEdicao = null;
-    function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas) {
+    function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas, dataInicio, dataFim) {
         if (!verificarPermissaoAdmin()) return;
         idTurmaEdicao = id;
         document.getElementById('edit-turma-curso').value = curso;
@@ -419,6 +439,8 @@
         document.getElementById('edit-turma-turno').value = turno;
         document.getElementById('edit-turma-instrutor').value = instrutor;
         document.getElementById('edit-turma-vagas').value = vagas;
+        document.getElementById('edit-turma-inicio').value = dataInicio && dataInicio !== 'null' && dataInicio !== 'undefined' ? dataInicio : '';
+        document.getElementById('edit-turma-fim').value = dataFim && dataFim !== 'null' && dataFim !== 'undefined' ? dataFim : '';
         
         document.getElementById('form-editar-turma').style.display = 'block';
         document.getElementById('form-curso').style.display = 'none';
@@ -435,8 +457,10 @@
         const turno = document.getElementById('edit-turma-turno').value;
         const instrutor = document.getElementById('edit-turma-instrutor').value.trim();
         const vagas = parseInt(document.getElementById('edit-turma-vagas').value);
+        const dataInicio = document.getElementById('edit-turma-inicio').value;
+        const dataFim = document.getElementById('edit-turma-fim').value;
 
-        if(!nomeTurma || !instrutor || !vagas) { alert("Preencha todos os campos."); return; }
+        if(!nomeTurma || !instrutor || !vagas || !dataInicio || !dataFim) { alert("Preencha todos os campos obrigatórios, incluindo as datas."); return; }
 
         const novoIdentificador = `${nomeTurma} (${turno} - ${dia})`;
 
@@ -445,7 +469,9 @@
             dia_semana: dia,
             turno: turno,
             instrutor: instrutor,
-            vagas_limite: vagas
+            vagas_limite: vagas,
+            data_inicio: dataInicio,
+            data_fim: dataFim
         }).eq('id', idTurmaEdicao);
 
         if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
@@ -692,7 +718,7 @@
                             <div style="margin-top: 8px; display:flex; gap:6px;">
                                 <button class="btn btn-secondary btn-sm" style="background:#23324c;" onclick="gerenciarAlunosTurma('${curso.nome}', '${turma.identificador}')">👥 Alunos</button>
                                 <button class="btn btn-secondary btn-sm" style="background:#4b5563;" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir</button>
-                                <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite})">✏️ Editar</button>
+                                <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar</button>
                                 <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
                             </div>
                         </div>
