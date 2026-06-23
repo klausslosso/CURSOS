@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Cursos e Turmas - CCP</title>
+    <title>Gestão de Cursos e Turmas - CCP / SDETR</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         /* --- Variáveis Globais (Modo Escuro / Dark Mode) --- */
@@ -32,9 +32,11 @@
 
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .full-width { grid-column: 1 / -1; }
         label { font-size: 10pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        input, select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 6px; outline: none; font-size: 10pt; transition: var(--transition); }
-        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+        input, select, textarea { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 6px; outline: none; font-size: 10pt; transition: var(--transition); font-family: inherit; }
+        textarea { resize: vertical; }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
         
         /* --- Botões --- */
         .btn { padding: 12px 15px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 10pt; }
@@ -50,7 +52,7 @@
 
         /* --- Dashboard de Turmas --- */
         .curso-block { background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-        .curso-header { font-size: 14pt; font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; }
+        .curso-header { font-size: 14pt; font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         
         .turma-row { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .turma-info { display: flex; flex-direction: column; gap: 4px; }
@@ -114,12 +116,44 @@
 
         <div id="form-curso" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
             <h3>Cadastrar Novo Curso</h3>
-            <div class="form-grid" style="align-items: end;">
-                <div class="form-group" style="flex: 2;">
+            <div class="form-grid">
+                <div class="form-group">
                     <label>Nome Oficial do Curso</label>
                     <input type="text" id="novo-curso-nome" placeholder="Ex: INFORMÁTICA BÁSICA">
                 </div>
+                <div class="form-group">
+                    <label>Carga Horária (Apenas Números)</label>
+                    <input type="number" id="novo-curso-carga" placeholder="Ex: 52">
+                </div>
+                <div class="form-group full-width">
+                    <label>Conteúdo Programático (Ementa para Certificado)</label>
+                    <textarea id="novo-curso-conteudo" rows="5" placeholder="1. Introdução ao tema...&#10;2. Desenvolvimento...&#10;3. Avaliação final..."></textarea>
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
                 <button class="btn btn-secondary" onclick="salvarCurso()">Gravar Curso</button>
+            </div>
+        </div>
+
+        <div id="form-editar-curso" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
+            <h3 style="color: var(--warning);">✏️ Modificar Parâmetros do Curso</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nome Oficial do Curso</label>
+                    <input type="text" id="edit-curso-nome">
+                </div>
+                <div class="form-group">
+                    <label>Carga Horária (Apenas Números)</label>
+                    <input type="number" id="edit-curso-carga">
+                </div>
+                <div class="form-group full-width">
+                    <label>Conteúdo Programático (Ementa para Certificado)</label>
+                    <textarea id="edit-curso-conteudo" rows="6"></textarea>
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-warning" onclick="atualizarCurso()">Atualizar Curso</button>
+                <button class="btn btn-danger btn-sm" onclick="fecharEdicaoCurso()">Cancelar</button>
             </div>
         </div>
 
@@ -251,7 +285,7 @@
     </div>
 
     <div class="card">
-        <h2>Dashboard de Lotação do CCP</h2>
+        <h2>Dashboard de Lotação do CCP / SDETR</h2>
         <div id="dashboard-container" style="margin-top: 20px;">
             <p style="text-align: center; color: var(--text-muted);">A carregar métricas da nuvem...</p>
         </div>
@@ -271,6 +305,8 @@
     
     let currentGerenciamentoCurso = "";
     let currentGerenciamentoIdentificador = "";
+    let idTurmaEdicao = null;
+    let idCursoEdicao = null;
 
     document.addEventListener("DOMContentLoaded", async () => {
         try {
@@ -350,12 +386,28 @@
 
     async function encerrarSessao() { await supa.auth.signOut(); window.location.reload(); }
 
+    function fecharTodosFormulariosAdmin() {
+        document.getElementById('form-curso').style.display = 'none';
+        document.getElementById('form-turma').style.display = 'none';
+        document.getElementById('form-editar-curso').style.display = 'none';
+        document.getElementById('form-editar-turma').style.display = 'none';
+    }
+
     function toggleForm(formId) {
-        if ((formId === 'form-curso' || formId === 'form-turma') && !verificarPermissaoAdmin()) return;
+        if (!verificarPermissaoAdmin()) return;
         
-        const form = document.getElementById(formId);
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        if(formId === 'form-turma') atualizarSelectCursos();
+        const isCurrentlyVisible = document.getElementById(formId).style.display === 'block';
+        fecharTodosFormulariosAdmin();
+        
+        if (!isCurrentlyVisible) {
+            document.getElementById(formId).style.display = 'block';
+            if(formId === 'form-turma') atualizarSelectCursos();
+        }
+    }
+
+    function fecharEdicaoCurso() {
+        document.getElementById('form-editar-curso').style.display = 'none';
+        idCursoEdicao = null;
     }
 
     function aplicarMascaraBuscaTurma(input) {
@@ -382,18 +434,77 @@
         }
     }
 
+    // --- FUNÇÕES DE CURSO (CRIAR E EDITAR) ---
+
     async function salvarCurso() {
         if (!verificarPermissaoAdmin()) return;
         const nome = document.getElementById('novo-curso-nome').value.trim().toUpperCase();
-        if(!nome) { alert("Indique o nome do curso."); return; }
+        const carga = document.getElementById('novo-curso-carga').value.trim();
+        const conteudo = document.getElementById('novo-curso-conteudo').value.trim();
 
-        const { error } = await supa.from('cursos').insert({ nome: nome, status: 'Ativo' });
+        if(!nome) { alert("Indique o nome oficial do curso."); return; }
+
+        const payload = { 
+            nome: nome, 
+            carga_horaria: carga,
+            conteudo_programatico: conteudo,
+            status: 'Ativo' 
+        };
+
+        const { error } = await supa.from('cursos').insert(payload);
         if(error) { alert("Erro ao registar curso: " + error.message); return; }
 
         document.getElementById('novo-curso-nome').value = '';
-        toggleForm('form-curso');
+        document.getElementById('novo-curso-carga').value = '';
+        document.getElementById('novo-curso-conteudo').value = '';
+        
+        fecharTodosFormulariosAdmin();
         carregarDashboard();
     }
+
+    function prepararEdicaoCurso(id) {
+        if (!verificarPermissaoAdmin()) return;
+        
+        const curso = cursosMemoria.find(c => c.id == id);
+        if(!curso) return;
+
+        idCursoEdicao = id;
+        document.getElementById('edit-curso-nome').value = curso.nome;
+        document.getElementById('edit-curso-carga').value = curso.carga_horaria || '';
+        document.getElementById('edit-curso-conteudo').value = curso.conteudo_programatico || '';
+        
+        fecharTodosFormulariosAdmin();
+        document.getElementById('painel-alunos-turma').style.display = 'none';
+        document.getElementById('form-editar-curso').style.display = 'block';
+        window.scrollTo({ top: document.getElementById('form-editar-curso').offsetTop, behavior: 'smooth' });
+    }
+
+    async function atualizarCurso() {
+        if (!verificarPermissaoAdmin()) return;
+        if(!idCursoEdicao) return;
+        
+        const nome = document.getElementById('edit-curso-nome').value.trim().toUpperCase();
+        const carga = document.getElementById('edit-curso-carga').value.trim();
+        const conteudo = document.getElementById('edit-curso-conteudo').value.trim();
+
+        if(!nome) { alert("O nome do curso é obrigatório."); return; }
+
+        const payload = {
+            nome: nome,
+            carga_horaria: carga,
+            conteudo_programatico: conteudo
+        };
+
+        const { error } = await supa.from('cursos').update(payload).eq('id', idCursoEdicao);
+
+        if(error) { alert("Erro ao atualizar curso: " + error.message); return; }
+
+        alert("Parâmetros do curso atualizados com sucesso!");
+        fecharEdicaoCurso();
+        await carregarDashboard();
+    }
+
+    // --- FUNÇÕES DE TURMA ---
 
     async function salvarTurma() {
         if (!verificarPermissaoAdmin()) return;
@@ -425,11 +536,10 @@
         const { error } = await supa.from('turmas').insert(payload);
         if(error) { alert("Erro ao registar turma: " + error.message); return; }
 
-        toggleForm('form-turma');
+        fecharTodosFormulariosAdmin();
         carregarDashboard();
     }
 
-    let idTurmaEdicao = null;
     function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas, dataInicio, dataFim) {
         if (!verificarPermissaoAdmin()) return;
         idTurmaEdicao = id;
@@ -442,10 +552,9 @@
         document.getElementById('edit-turma-inicio').value = dataInicio && dataInicio !== 'null' && dataInicio !== 'undefined' ? dataInicio : '';
         document.getElementById('edit-turma-fim').value = dataFim && dataFim !== 'null' && dataFim !== 'undefined' ? dataFim : '';
         
-        document.getElementById('form-editar-turma').style.display = 'block';
-        document.getElementById('form-curso').style.display = 'none';
-        document.getElementById('form-turma').style.display = 'none';
+        fecharTodosFormulariosAdmin();
         document.getElementById('painel-alunos-turma').style.display = 'none';
+        document.getElementById('form-editar-turma').style.display = 'block';
         window.scrollTo({ top: document.getElementById('form-editar-turma').offsetTop, behavior: 'smooth' });
     }
 
@@ -489,13 +598,15 @@
         carregarDashboard();
     }
 
+    // --- FUNÇÕES DE VINCULAÇÃO DE ALUNOS ---
+
     async function gerenciarAlunosTurma(cursoNome, identificadorTurma) {
         currentGerenciamentoCurso = cursoNome;
         currentGerenciamentoIdentificador = identificadorTurma;
         
         document.getElementById('titulo-gerenciamento-alunos').innerText = `👥 Alunos em: ${cursoNome} [${identificadorTurma}]`;
         document.getElementById('painel-alunos-turma').style.display = 'block';
-        document.getElementById('form-editar-turma').style.display = 'none';
+        fecharTodosFormulariosAdmin();
         
         await carregarAlunosDaTurma();
         window.scrollTo({ top: document.getElementById('painel-alunos-turma').offsetTop, behavior: 'smooth' });
@@ -629,6 +740,8 @@
         await carregarDashboard();
     }
 
+    // --- CARREGAMENTO DO SISTEMA ---
+
     async function atualizarSelectCursos() {
         const select = document.getElementById('nova-turma-curso');
         select.innerHTML = '<option value="">Selecione o Curso...</option>';
@@ -688,8 +801,16 @@
             htmlFinal += `
             <div class="curso-block">
                 <div class="curso-header">
-                    <span>📚 ${curso.nome}</span>
-                    <span style="font-size: 11pt; color: var(--text-muted); font-weight: normal;">${turmasDoCurso.length} Turma(s)</span>
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        📚 ${curso.nome} 
+                        <span style="font-size: 10pt; color: var(--text-muted); font-weight: normal; background: var(--bg-card); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">
+                            ⏳ ${curso.carga_horaria ? curso.carga_horaria + 'h' : 'N/I'}
+                        </span>
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="font-size: 11pt; color: var(--text-muted); font-weight: normal;">${turmasDoCurso.length} Turma(s)</span>
+                        <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${curso.id}')">✏️ Editar Curso</button>
+                    </div>
                 </div>`;
 
             if(turmasDoCurso.length === 0) {
