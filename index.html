@@ -111,8 +111,20 @@
             <div style="display: flex; gap: 10px;">
                 <button class="btn btn-secondary btn-sm admin-only" onclick="toggleForm('form-curso')">+ Novo Curso</button>
                 <button class="btn btn-primary btn-sm admin-only" onclick="toggleForm('form-turma')">+ Nova Turma</button>
+                <button class="btn btn-warning btn-sm admin-only" onclick="abrirTurmasInativas()">Turmas Inativas</button>
             </div>
         </h2>
+
+        <div id="painel-turmas-inativas" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
+            <h3 style="color: var(--warning);">🔄 Gestão de Turmas Inativas</h3>
+            <table class="styled-table">
+                <thead><tr><th>Curso</th><th>Identificação da Turma</th><th style="width: 120px; text-align: center;">Ações</th></tr></thead>
+                <tbody id="tbody-turmas-inativas"></tbody>
+            </table>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn btn-danger btn-sm" onclick="document.getElementById('painel-turmas-inativas').style.display='none'">Fechar Painel</button>
+            </div>
+        </div>
 
         <div id="form-curso" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
             <h3>Cadastrar Novo Curso</h3>
@@ -284,6 +296,25 @@
         </div>
     </div>
 
+    <!-- Painel de Lista de Espera -->
+    <div class="card" id="painel-lista-espera" style="display: none; border-left: 4px solid var(--warning);">
+        <h3 id="titulo-lista-espera">📋 Lista de Espera</h3>
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Nome do Aluno</th>
+                    <th>CPF</th>
+                    <th style="width: 30%;">Turma de Destino</th>
+                    <th style="text-align: center; width: 160px;">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-lista-espera"></tbody>
+        </table>
+        <div style="text-align: right; margin-top: 15px;">
+            <button class="btn btn-danger btn-sm" onclick="document.getElementById('painel-lista-espera').style.display='none'">Fechar Lista de Espera</button>
+        </div>
+    </div>
+
     <div class="card">
         <h2>Dashboard de Lotação do CCP / SDETR</h2>
         <div id="dashboard-container" style="margin-top: 20px;">
@@ -391,6 +422,8 @@
         document.getElementById('form-turma').style.display = 'none';
         document.getElementById('form-editar-curso').style.display = 'none';
         document.getElementById('form-editar-turma').style.display = 'none';
+        document.getElementById('painel-turmas-inativas').style.display = 'none';
+        document.getElementById('painel-lista-espera').style.display = 'none';
     }
 
     function toggleForm(formId) {
@@ -434,7 +467,7 @@
         }
     }
 
-    // --- FUNÇÕES DE CURSO (CRIAR E EDITAR) ---
+    // --- FUNÇÕES DE CURSO ---
 
     async function salvarCurso() {
         if (!verificarPermissaoAdmin()) return;
@@ -504,7 +537,14 @@
         await carregarDashboard();
     }
 
-    // --- FUNÇÕES DE TURMA ---
+    async function desativarCurso(id) {
+        if (!verificarPermissaoAdmin()) return;
+        if(!confirm("Confirma a inativação deste curso? Ele deixará de receber turmas e ficará oculto da listagem principal.")) return;
+        await supa.from('cursos').update({ status: 'Inativo' }).eq('id', id);
+        carregarDashboard();
+    }
+
+    // --- FUNÇÕES DE TURMA (CRIAR, EDITAR, INATIVAR E REATIVAR) ---
 
     async function salvarTurma() {
         if (!verificarPermissaoAdmin()) return;
@@ -593,12 +633,135 @@
 
     async function alterarStatusTurma(id, novoStatus) {
         if (!verificarPermissaoAdmin()) return;
-        if(!confirm(`Confirma a alteração do status da turma para '${novoStatus}'?`)) return;
+        if(!confirm(`Confirma a alteração do status da turma para '${novoStatus}'? Ela não aparecerá mais no dashboard.`)) return;
         await supa.from('turmas').update({ status: novoStatus }).eq('id', id);
         carregarDashboard();
     }
 
-    // --- FUNÇÕES DE VINCULAÇÃO DE ALUNOS ---
+    async function abrirTurmasInativas() {
+        if (!verificarPermissaoAdmin()) return;
+        fecharTodosFormulariosAdmin();
+        document.getElementById('painel-turmas-inativas').style.display = 'block';
+        
+        const tbody = document.getElementById('tbody-turmas-inativas');
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">A pesquisar turmas inativas...</td></tr>';
+        
+        const { data, error } = await supa.from('turmas').select('id, identificador, curso_nome').eq('status', 'Inativo').order('curso_nome');
+        
+        if (error || !data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nenhuma turma inativa encontrada.</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        data.forEach(t => {
+            tbody.innerHTML += `<tr>
+                <td>${t.curso_nome}</td>
+                <td>${t.identificador}</td>
+                <td style="text-align:center;">
+                    <button class="btn btn-secondary btn-sm" onclick="reativarTurma('${t.id}')">🔄 Reativar</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    async function reativarTurma(id) {
+        if (!verificarPermissaoAdmin()) return;
+        await supa.from('turmas').update({ status: 'Ativo' }).eq('id', id);
+        abrirTurmasInativas();
+        carregarDashboard();
+    }
+
+    async function alternarMatriculasTurma(id, statusAtual) {
+        if (!verificarPermissaoEscrita()) return;
+        const novoStatus = statusAtual === 'Ativo' ? 'Fechada' : 'Ativo';
+        const msg = statusAtual === 'Ativo' ? 'BLOQUEAR o recebimento de novos alunos' : 'LIBERAR o recebimento de novos alunos';
+        
+        if(!confirm(`Confirma que deseja ${msg} para esta turma?`)) return;
+        
+        const { error } = await supa.from('turmas').update({ status: novoStatus }).eq('id', id);
+        if(error) { alert("Erro ao alterar status: " + error.message); return; }
+        
+        carregarDashboard();
+    }
+
+    // --- FUNÇÕES DE VINCULAÇÃO E LISTA DE ESPERA ---
+
+    async function gerenciarListaEspera(cursoNome) {
+        fecharTodosFormulariosAdmin();
+        document.getElementById('painel-alunos-turma').style.display = 'none';
+        document.getElementById('painel-lista-espera').style.display = 'block';
+        document.getElementById('titulo-lista-espera').innerText = `📋 Lista de Espera: ${cursoNome}`;
+        
+        const tbody = document.getElementById('tbody-lista-espera');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A pesquisar na fila...</td></tr>';
+        
+        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
+        const { data: alunos, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').like('cursos', `%${stringEspera}%`);
+        
+        if (error) { tbody.innerHTML = '<tr><td colspan="4">Erro na busca de alunos em espera.</td></tr>'; return; }
+        if (!alunos || alunos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A lista de espera para este curso está vazia.</td></tr>';
+            return;
+        }
+
+        const { data: turmas } = await supa.from('turmas').select('identificador, status').eq('curso_nome', cursoNome).neq('status', 'Inativo');
+        
+        let opcoesTurma = '<option value="">Selecione a Turma...</option>';
+        if (turmas) {
+            turmas.forEach(t => {
+                const statusText = t.status === 'Fechada' ? ' (Matrículas Bloqueadas)' : '';
+                opcoesTurma += `<option value="${t.identificador}">${t.identificador}${statusText}</option>`;
+            });
+        }
+
+        tbody.innerHTML = '';
+        alunos.forEach(aluno => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${aluno.nome}</strong></td>
+                <td>${aluno.cpf}</td>
+                <td>
+                    <select class="operacional-only" id="turma-destino-${aluno.cpf}" style="width: 100%; padding: 6px;">
+                        ${opcoesTurma}
+                    </select>
+                </td>
+                <td style="text-align:center;">
+                    <button class="btn btn-secondary btn-sm operacional-only" onclick="promoverAlunoEspera('${aluno.cpf}', '${cursoNome}')">Tornar Titular</button>
+                </td>
+            </tr>`;
+        });
+        window.scrollTo({ top: document.getElementById('painel-lista-espera').offsetTop, behavior: 'smooth' });
+    }
+
+    async function promoverAlunoEspera(cpf, cursoNome) {
+        if (!verificarPermissaoEscrita()) return;
+        const select = document.getElementById(`turma-destino-${cpf}`);
+        const identificadorTurma = select.value;
+        
+        if(!identificadorTurma) { alert("Selecione a turma de destino para este aluno."); return; }
+
+        const { data: turmaData } = await supa.from('turmas').select('status').eq('curso_nome', cursoNome).eq('identificador', identificadorTurma).single();
+        if(turmaData && turmaData.status === 'Fechada') {
+            if(!confirm("Atenção: A turma de destino selecionada encontra-se com matrículas bloqueadas. Confirma a promoção forçada do aluno para titular?")) return;
+        }
+
+        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
+        const stringTurma = `${cursoNome} [${identificadorTurma}]`;
+
+        const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
+        if(error || !aluno) { alert("Erro ao localizar cadastro do aluno."); return; }
+
+        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
+        cursosArray = cursosArray.map(c => c === stringEspera ? stringTurma : c);
+        const novosCursos = cursosArray.join(' | ');
+
+        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
+        if(updError) { alert("Erro ao promover aluno: " + updError.message); return; }
+
+        alert("Aluno promovido a titular com sucesso.");
+        gerenciarListaEspera(cursoNome);
+        carregarDashboard();
+    }
 
     async function gerenciarAlunosTurma(cursoNome, identificadorTurma) {
         currentGerenciamentoCurso = cursoNome;
@@ -701,11 +864,30 @@
         const { data: aluno, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').eq('cpf', cpfBusca).single();
         if(error || !aluno) return alert("Aluno não localizado no banco de dados da nuvem.");
 
-        const stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        let stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
+        
+        const { data: turmaData } = await supa.from('turmas').select('vagas_limite, status').eq('curso_nome', currentGerenciamentoCurso).eq('identificador', currentGerenciamentoIdentificador).single();
+        if (turmaData) {
+            if (turmaData.status === 'Fechada') {
+                alert("Ação impedida: Esta turma encontra-se com matrículas bloqueadas.");
+                return;
+            }
+
+            const { count } = await supa.from('alunos_ccp').select('cpf', { count: 'exact', head: true }).like('cursos', `%${stringTurma}%`);
+            if (count >= turmaData.vagas_limite) {
+                const msgEspera = `A turma atingiu a capacidade máxima de ${turmaData.vagas_limite} vagas.\n\nEstá de acordo em inserir o aluno na Lista de Espera?`;
+                if(confirm(msgEspera)) {
+                    stringTurma = `${currentGerenciamentoCurso} [Pendente/Lista de Espera]`;
+                } else {
+                    return; 
+                }
+            }
+        }
+
         let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
         
         if (cursosArray.includes(stringTurma) || cursosArray.includes(`${stringTurma} (INATIVO)`)) {
-            return alert("O aluno " + aluno.nome + " já possui vínculo com esta turma.");
+            return alert("O aluno " + aluno.nome + " já possui vínculo com esta turma ou status.");
         }
 
         let cursosAtuais = aluno.cursos ? aluno.cursos.trim() : "";
@@ -771,7 +953,7 @@
 
         const [resCursos, resTurmas, resAlunos, resInstrutores] = await Promise.all([
             supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
-            supa.from('turmas').select('*').eq('status', 'Ativo').order('curso_nome'),
+            supa.from('turmas').select('*').neq('status', 'Inativo').order('curso_nome'),
             supa.from('alunos_ccp').select('cursos'),
             supa.from('instrutores').select('id, nome').order('nome')
         ]);
@@ -807,9 +989,11 @@
                             ⏳ ${curso.carga_horaria ? curso.carga_horaria + 'h' : 'N/I'}
                         </span>
                     </span>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <span style="font-size: 11pt; color: var(--text-muted); font-weight: normal;">${turmasDoCurso.length} Turma(s)</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="btn btn-secondary btn-sm operacional-only" onclick="gerenciarListaEspera('${curso.nome}')">📋 Lista de Espera</button>
+                        <span style="font-size: 11pt; color: var(--text-muted); font-weight: normal; margin-left: 10px;">${turmasDoCurso.length} Turma(s)</span>
                         <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${curso.id}')">✏️ Editar Curso</button>
+                        <button class="btn btn-danger btn-sm admin-only" onclick="desativarCurso('${curso.id}')">🗑️ Desativar</button>
                     </div>
                 </div>`;
 
@@ -828,16 +1012,20 @@
                     });
 
                     const taxaOcupacao = (contagemMatriculados / turma.vagas_limite) * 100;
-                    const classeVagas = contagemMatriculados >= turma.vagas_limite ? 'vagas-cheia' : 'vagas-disponiveis';
                     const preenchimento = taxaOcupacao > 100 ? 100 : taxaOcupacao;
+                    
+                    const classTravaMatricula = turma.status === 'Fechada' ? 'color: var(--warning);' : 'color: var(--secondary);';
+                    const indicativoFechado = turma.status === 'Fechada' ? ' <span style="color:var(--warning); font-size:9pt; font-weight:bold;">[MATRÍCULAS BLOQUEADAS]</span>' : '';
+                    const classeVagas = contagemMatriculados >= turma.vagas_limite ? 'vagas-cheia' : (turma.status === 'Fechada' ? 'vagas-cheia' : 'vagas-disponiveis');
 
                     htmlFinal += `
-                    <div class="turma-row">
+                    <div class="turma-row" style="${turma.status === 'Fechada' ? 'border-color: var(--warning);' : ''}">
                         <div class="turma-info">
-                            <span class="turma-nome">${turma.identificador}</span>
+                            <span class="turma-nome">${turma.identificador}${indicativoFechado}</span>
                             <span class="turma-detalhes">Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}</span>
                             <div style="margin-top: 8px; display:flex; gap:6px;">
                                 <button class="btn btn-secondary btn-sm" style="background:#23324c;" onclick="gerenciarAlunosTurma('${curso.nome}', '${turma.identificador}')">👥 Alunos</button>
+                                <button class="btn ${turma.status === 'Ativo' ? 'btn-warning' : 'btn-secondary'} btn-sm operacional-only" style="background: ${turma.status === 'Ativo' ? '#f59e0b' : '#10b981'};" onclick="alternarMatriculasTurma('${turma.id}', '${turma.status}')">${turma.status === 'Ativo' ? '🔒 Bloquear Matr.' : '🔓 Liberar Matr.'}</button>
                                 <button class="btn btn-secondary btn-sm" style="background:#4b5563;" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir</button>
                                 <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar</button>
                                 <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
@@ -847,7 +1035,7 @@
                             <span class="vagas-count ${classeVagas}">${contagemMatriculados} / ${turma.vagas_limite}</span>
                             <span style="font-size: 9pt; color: var(--text-muted);">Vagas Ocupadas</span>
                             <div class="progress-bar">
-                                <div class="progress-fill ${contagemMatriculados >= turma.vagas_limite ? 'full' : ''}" style="width: ${preenchimento}%;"></div>
+                                <div class="progress-fill ${contagemMatriculados >= turma.vagas_limite ? 'full' : ''}" style="width: ${preenchimento}%; ${turma.status === 'Fechada' ? 'background: var(--warning);' : ''}"></div>
                             </div>
                         </div>
                     </div>`;
