@@ -673,7 +673,7 @@
     }
 
     async function alternarMatriculasTurma(id, statusAtual) {
-        if (!verificarPermissaoEscrita()) return;
+        if (!verificarPermissaoAdmin()) return; // Validação exclusiva para Admin
         const novoStatus = statusAtual === 'Ativo' ? 'Fechada' : 'Ativo';
         const msg = statusAtual === 'Ativo' ? 'BLOQUEAR o recebimento de novos alunos' : 'LIBERAR o recebimento de novos alunos';
         
@@ -1025,7 +1025,7 @@
                             <span class="turma-detalhes">Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}</span>
                             <div style="margin-top: 8px; display:flex; gap:6px;">
                                 <button class="btn btn-secondary btn-sm" style="background:#23324c;" onclick="gerenciarAlunosTurma('${curso.nome}', '${turma.identificador}')">👥 Alunos</button>
-                                <button class="btn ${turma.status === 'Ativo' ? 'btn-warning' : 'btn-secondary'} btn-sm operacional-only" style="background: ${turma.status === 'Ativo' ? '#f59e0b' : '#10b981'};" onclick="alternarMatriculasTurma('${turma.id}', '${turma.status}')">${turma.status === 'Ativo' ? '🔒 Bloquear Matr.' : '🔓 Liberar Matr.'}</button>
+                                <button class="btn ${turma.status === 'Ativo' ? 'btn-warning' : 'btn-secondary'} btn-sm admin-only" style="background: ${turma.status === 'Ativo' ? '#f59e0b' : '#10b981'};" onclick="alternarMatriculasTurma('${turma.id}', '${turma.status}')">${turma.status === 'Ativo' ? '🔒 Bloquear Matr.' : '🔓 Liberar Matr.'}</button>
                                 <button class="btn btn-secondary btn-sm" style="background:#4b5563;" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir</button>
                                 <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar</button>
                                 <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
