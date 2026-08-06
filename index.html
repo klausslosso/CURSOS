@@ -698,13 +698,30 @@
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A pesquisar na fila...</td></tr>';
         
         const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
-        const { data: alunos, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').like('cursos', `%${stringEspera}%`);
+        const { data: alunos, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos, data_cadastro').like('cursos', `%${stringEspera}%`);
         
         if (error) { tbody.innerHTML = '<tr><td colspan="4">Erro na busca de alunos em espera.</td></tr>'; return; }
         if (!alunos || alunos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A lista de espera para este curso está vazia.</td></tr>';
             return;
         }
+
+        alunos.sort((a, b) => {
+            let dataA = new Date(0);
+            let dataB = new Date(0);
+
+            if (a.data_cadastro && a.data_cadastro.includes('/')) {
+                const [dia, mes, ano] = a.data_cadastro.split('/');
+                dataA = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+            }
+
+            if (b.data_cadastro && b.data_cadastro.includes('/')) {
+                const [dia, mes, ano] = b.data_cadastro.split('/');
+                dataB = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+            }
+
+            return dataA - dataB;
+        });
 
         const { data: turmas } = await supa.from('turmas').select('identificador, matriculas_bloqueadas').eq('curso_nome', cursoNome).neq('status', 'Inativo');
         
