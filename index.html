@@ -50,23 +50,27 @@
         .btn-warning:hover { background: #d97706; }
         .btn-sm { padding: 6px 12px; font-size: 9pt; width: auto; }
 
-        /* --- Dashboard de Turmas --- */
-        .curso-block { background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-        .curso-header { font-size: 14pt; font-weight: bold; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        /* --- Dashboard Simplificado (Novo) --- */
+        .curso-simplified-block { background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .curso-simplified-header { font-size: 14pt; font-weight: bold; color: var(--primary); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
         
-        .turma-row { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .turma-info { display: flex; flex-direction: column; gap: 4px; }
-        .turma-nome { font-size: 12pt; font-weight: bold; color: var(--text-main); }
-        .turma-detalhes { font-size: 10pt; color: var(--text-muted); }
+        .turma-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
         
-        .vagas-box { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-        .vagas-count { font-size: 14pt; font-weight: bold; }
-        .vagas-cheia { color: var(--danger); }
-        .vagas-disponiveis { color: var(--secondary); }
+        .turma-card { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 8px; cursor: pointer; transition: var(--transition); display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; }
+        .turma-card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .turma-card.bloqueada { border-color: var(--warning); }
+        .turma-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .turma-card-title { font-weight: bold; font-size: 12pt; color: var(--text-main); }
+        .turma-card-subtitle { font-size: 9pt; color: var(--text-muted); margin-top: 4px; }
+        .turma-card-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
         
-        .progress-bar { width: 150px; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--secondary); transition: width 0.5s ease; }
-        .progress-fill.full { background: var(--danger); }
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; display: inline-block; }
+        .badge-vagas { background: var(--bg-input); color: var(--text-main); }
+        .badge-vagas.disponivel { background: rgba(16, 185, 129, 0.15); color: var(--secondary); border: 1px solid var(--secondary); }
+        .badge-vagas.ideal { background: rgba(59, 130, 246, 0.15); color: var(--primary); border: 1px solid var(--primary); }
+        .badge-vagas.excedida { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-espera { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+        .badge-status { font-size: 8pt; padding: 2px 6px; }
 
         /* --- Tabelas Administrativas --- */
         .styled-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
@@ -264,63 +268,81 @@
             </div>
             <div style="margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
                 <button class="btn btn-warning" onclick="atualizarTurma()">Atualizar Turma</button>
-                <button class="btn btn-danger btn-sm" onclick="document.getElementById('form-editar-turma').style.display='none'">Cancelar</button>
+                <button class="btn btn-danger btn-sm" onclick="fecharEdicaoTurma()">Cancelar</button>
             </div>
         </div>
     </div>
 
-    <div class="card" id="painel-alunos-turma" style="display: none; border-left: 4px solid var(--secondary);">
-        <h3 id="titulo-gerenciamento-alunos">👥 Alunos Vinculados</h3>
-        
-        <div class="operacional-only" style="background-color: var(--bg-body); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
-            <label style="color: var(--secondary); font-weight: bold; margin-bottom: 8px;">Matricular Aluno Diretamente Nesta Turma</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="input-vinculo-aluno" list="lista-todos-alunos" placeholder="Busque o aluno por Nome ou CPF..." style="flex: 2;" oninput="aplicarMascaraBuscaTurma(this)">
-                <datalist id="lista-todos-alunos"></datalist>
-                <button type="button" class="btn btn-secondary" onclick="vincularAlunoTurma()">Vincular Aluno</button>
+    <!-- WRAPPER 1: DASHBOARD SIMPLIFICADO -->
+    <div id="view-dashboard">
+        <div class="card">
+            <h2>Dashboard de Lotação do CCP / SDETR</h2>
+            <div id="dashboard-container" style="margin-top: 20px;">
+                <p style="text-align: center; color: var(--text-muted);">A carregar métricas da nuvem...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- WRAPPER 2: VISÃO DETALHADA DA TURMA -->
+    <div id="view-detalhes-turma" style="display: none;">
+        <!-- Cabeçalho e Ações da Turma -->
+        <div class="card" style="border-top: 4px solid var(--primary);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                <div style="flex: 1; min-width: 300px;">
+                    <button class="btn btn-secondary btn-sm" style="background-color: var(--bg-input); color: var(--text-main); margin-bottom: 15px;" onclick="voltarDashboard()">⬅ Voltar ao Dashboard</button>
+                    <!-- A tag h2 agora tem display: block para não interferir com elementos abaixo -->
+                    <h2 id="detalhes-turma-titulo" style="border: none; padding: 0; margin: 0; color: var(--primary); display: block;">Título da Turma</h2>
+                    <!-- Subtítulo desmembrado da tag h2 para quebrar a linha corretamente -->
+                    <div id="detalhes-turma-subtitulo" style="font-size:11pt; color:var(--text-muted); margin-top:8px;"></div>
+                </div>
+                <div id="detalhes-turma-acoes" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                    <!-- Botões de ação injetados via JS -->
+                </div>
             </div>
         </div>
 
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Nome do Aluno</th>
-                    <th>CPF</th>
-                    <th style="text-align: center; width: 160px;">Ações</th>
-                </tr>
-            </thead>
-            <tbody id="tbody-alunos-matriculados"></tbody>
-        </table>
-        <div style="text-align: right; margin-top: 15px;">
-            <button class="btn btn-danger btn-sm" onclick="document.getElementById('painel-alunos-turma').style.display='none'">Fechar Painel de Alunos</button>
+        <!-- Painel de Alunos Matriculados -->
+        <div class="card" id="painel-alunos-turma" style="border-left: 4px solid var(--secondary);">
+            <h3 id="titulo-gerenciamento-alunos">👥 Alunos Vinculados</h3>
+            
+            <div class="operacional-only" style="background-color: var(--bg-body); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+                <label style="color: var(--secondary); font-weight: bold; margin-bottom: 8px;">Matricular Aluno Diretamente Nesta Turma</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="input-vinculo-aluno" list="lista-todos-alunos" placeholder="Busque o aluno por Nome ou CPF..." style="flex: 2;" oninput="aplicarMascaraBuscaTurma(this)">
+                    <datalist id="lista-todos-alunos"></datalist>
+                    <button type="button" class="btn btn-secondary" onclick="vincularAlunoTurma()">Vincular Aluno</button>
+                </div>
+            </div>
+
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Nome do Aluno</th>
+                        <th>CPF</th>
+                        <th style="text-align: center; width: 160px;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-alunos-matriculados"></tbody>
+            </table>
+        </div>
+
+        <!-- Painel de Lista de Espera -->
+        <div class="card" id="painel-lista-espera" style="border-left: 4px solid var(--warning);">
+            <h3 id="titulo-lista-espera">📋 Lista de Espera do Curso</h3>
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Nome do Aluno</th>
+                        <th>CPF</th>
+                        <th style="width: 30%;">Turma de Destino</th>
+                        <th style="text-align: center; width: 160px;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-lista-espera"></tbody>
+            </table>
         </div>
     </div>
 
-    <!-- Painel de Lista de Espera -->
-    <div class="card" id="painel-lista-espera" style="display: none; border-left: 4px solid var(--warning);">
-        <h3 id="titulo-lista-espera">📋 Lista de Espera</h3>
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Nome do Aluno</th>
-                    <th>CPF</th>
-                    <th style="width: 30%;">Turma de Destino</th>
-                    <th style="text-align: center; width: 160px;">Ações</th>
-                </tr>
-            </thead>
-            <tbody id="tbody-lista-espera"></tbody>
-        </table>
-        <div style="text-align: right; margin-top: 15px;">
-            <button class="btn btn-danger btn-sm" onclick="document.getElementById('painel-lista-espera').style.display='none'">Fechar Lista de Espera</button>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>Dashboard de Lotação do CCP / SDETR</h2>
-        <div id="dashboard-container" style="margin-top: 20px;">
-            <p style="text-align: center; color: var(--text-muted);">A carregar métricas da nuvem...</p>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -331,11 +353,15 @@
     let utilizadorAtual = null;
     let nivelAcessoUsuario = null; 
     let cursosMemoria = [];
-    let todosAlunosNuvem = [];
+    let turmasMemoria = [];
+    let alunosMemoria = [];
     let instrutoresMemoria = [];
+    let todosAlunosNuvem = [];
     
+    let idTurmaAberta = null;
     let currentGerenciamentoCurso = "";
     let currentGerenciamentoIdentificador = "";
+    
     let idTurmaEdicao = null;
     let idCursoEdicao = null;
 
@@ -402,7 +428,6 @@
         document.getElementById('user-profile-display').innerText = nivelAcessoUsuario;
         
         document.body.classList.remove('admin-mode', 'operacional-mode');
-        
         if (nivelAcessoUsuario === 'Admin') {
             document.body.classList.add('admin-mode');
         } else if (nivelAcessoUsuario === 'Operacional') {
@@ -411,6 +436,7 @@
 
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
+        
         await carregarDashboard();
         await baixarListaGlobalAlunos();
     }
@@ -423,25 +449,20 @@
         document.getElementById('form-editar-curso').style.display = 'none';
         document.getElementById('form-editar-turma').style.display = 'none';
         document.getElementById('painel-turmas-inativas').style.display = 'none';
-        document.getElementById('painel-lista-espera').style.display = 'none';
     }
 
     function toggleForm(formId) {
         if (!verificarPermissaoAdmin()) return;
-        
         const isCurrentlyVisible = document.getElementById(formId).style.display === 'block';
         fecharTodosFormulariosAdmin();
-        
         if (!isCurrentlyVisible) {
             document.getElementById(formId).style.display = 'block';
             if(formId === 'form-turma') atualizarSelectCursos();
         }
     }
 
-    function fecharEdicaoCurso() {
-        document.getElementById('form-editar-curso').style.display = 'none';
-        idCursoEdicao = null;
-    }
+    function fecharEdicaoCurso() { document.getElementById('form-editar-curso').style.display = 'none'; idCursoEdicao = null; }
+    function fecharEdicaoTurma() { document.getElementById('form-editar-turma').style.display = 'none'; idTurmaEdicao = null; }
 
     function aplicarMascaraBuscaTurma(input) {
         let v = input.value;
@@ -461,14 +482,11 @@
             todosAlunosNuvem = data;
             const dl = document.getElementById('lista-todos-alunos');
             dl.innerHTML = '';
-            data.forEach(a => {
-                dl.innerHTML += `<option value="${a.nome} - ${a.cpf}"></option>`;
-            });
+            data.forEach(a => { dl.innerHTML += `<option value="${a.nome} - ${a.cpf}"></option>`; });
         }
     }
 
     // --- FUNÇÕES DE CURSO ---
-
     async function salvarCurso() {
         if (!verificarPermissaoAdmin()) return;
         const nome = document.getElementById('novo-curso-nome').value.trim().toUpperCase();
@@ -477,27 +495,16 @@
 
         if(!nome) { alert("Indique o nome oficial do curso."); return; }
 
-        const payload = { 
-            nome: nome, 
-            carga_horaria: carga,
-            conteudo_programatico: conteudo,
-            status: 'Ativo' 
-        };
-
+        const payload = { nome: nome, carga_horaria: carga, conteudo_programatico: conteudo, status: 'Ativo' };
         const { error } = await supa.from('cursos').insert(payload);
         if(error) { alert("Erro ao registar curso: " + error.message); return; }
 
-        document.getElementById('novo-curso-nome').value = '';
-        document.getElementById('novo-curso-carga').value = '';
-        document.getElementById('novo-curso-conteudo').value = '';
-        
-        fecharTodosFormulariosAdmin();
-        carregarDashboard();
+        document.getElementById('novo-curso-nome').value = ''; document.getElementById('novo-curso-carga').value = ''; document.getElementById('novo-curso-conteudo').value = '';
+        fecharTodosFormulariosAdmin(); carregarDashboard();
     }
 
     function prepararEdicaoCurso(id) {
         if (!verificarPermissaoAdmin()) return;
-        
         const curso = cursosMemoria.find(c => c.id == id);
         if(!curso) return;
 
@@ -507,34 +514,24 @@
         document.getElementById('edit-curso-conteudo').value = curso.conteudo_programatico || '';
         
         fecharTodosFormulariosAdmin();
-        document.getElementById('painel-alunos-turma').style.display = 'none';
         document.getElementById('form-editar-curso').style.display = 'block';
         window.scrollTo({ top: document.getElementById('form-editar-curso').offsetTop, behavior: 'smooth' });
     }
 
     async function atualizarCurso() {
-        if (!verificarPermissaoAdmin()) return;
-        if(!idCursoEdicao) return;
-        
+        if (!verificarPermissaoAdmin() || !idCursoEdicao) return;
         const nome = document.getElementById('edit-curso-nome').value.trim().toUpperCase();
         const carga = document.getElementById('edit-curso-carga').value.trim();
         const conteudo = document.getElementById('edit-curso-conteudo').value.trim();
 
         if(!nome) { alert("O nome do curso é obrigatório."); return; }
-
-        const payload = {
-            nome: nome,
-            carga_horaria: carga,
-            conteudo_programatico: conteudo
-        };
+        const payload = { nome: nome, carga_horaria: carga, conteudo_programatico: conteudo };
 
         const { error } = await supa.from('cursos').update(payload).eq('id', idCursoEdicao);
-
         if(error) { alert("Erro ao atualizar curso: " + error.message); return; }
 
         alert("Parâmetros do curso atualizados com sucesso!");
-        fecharEdicaoCurso();
-        await carregarDashboard();
+        fecharEdicaoCurso(); await carregarDashboard();
     }
 
     async function desativarCurso(id) {
@@ -544,8 +541,7 @@
         carregarDashboard();
     }
 
-    // --- FUNÇÕES DE TURMA (CRIAR, EDITAR, INATIVAR E REATIVAR) ---
-
+    // --- FUNÇÕES DE TURMA ---
     async function salvarTurma() {
         if (!verificarPermissaoAdmin()) return;
         const curso = document.getElementById('nova-turma-curso').value;
@@ -560,25 +556,12 @@
         if(!curso || !nomeTurma || !instrutor || !vagas || !dataInicio || !dataFim) { alert("Preencha todos os campos da turma, incluindo o período de início e fim."); return; }
 
         const identificador_formatado = `${nomeTurma} (${turno} - ${dia})`;
-
-        const payload = {
-            curso_nome: curso,
-            identificador: identificador_formatado,
-            dia_semana: dia,
-            turno: turno,
-            instrutor: instrutor,
-            vagas_limite: vagas,
-            data_inicio: dataInicio,
-            data_fim: dataFim,
-            status: 'Ativo',
-            matriculas_bloqueadas: false
-        };
+        const payload = { curso_nome: curso, identificador: identificador_formatado, dia_semana: dia, turno: turno, instrutor: instrutor, vagas_limite: vagas, data_inicio: dataInicio, data_fim: dataFim, status: 'Ativo', matriculas_bloqueadas: false };
 
         const { error } = await supa.from('turmas').insert(payload);
         if(error) { alert("Erro ao registar turma: " + error.message); return; }
 
-        fecharTodosFormulariosAdmin();
-        carregarDashboard();
+        fecharTodosFormulariosAdmin(); carregarDashboard();
     }
 
     function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas, dataInicio, dataFim) {
@@ -594,14 +577,12 @@
         document.getElementById('edit-turma-fim').value = dataFim && dataFim !== 'null' && dataFim !== 'undefined' ? dataFim : '';
         
         fecharTodosFormulariosAdmin();
-        document.getElementById('painel-alunos-turma').style.display = 'none';
         document.getElementById('form-editar-turma').style.display = 'block';
         window.scrollTo({ top: document.getElementById('form-editar-turma').offsetTop, behavior: 'smooth' });
     }
 
     async function atualizarTurma() {
-        if (!verificarPermissaoAdmin()) return;
-        if(!idTurmaEdicao) return;
+        if (!verificarPermissaoAdmin() || !idTurmaEdicao) return;
         const nomeTurma = document.getElementById('edit-turma-nome').value.trim();
         const dia = document.getElementById('edit-turma-dia').value;
         const turno = document.getElementById('edit-turma-turno').value;
@@ -613,42 +594,29 @@
         if(!nomeTurma || !instrutor || !vagas || !dataInicio || !dataFim) { alert("Preencha todos os campos obrigatórios, incluindo as datas."); return; }
 
         const novoIdentificador = `${nomeTurma} (${turno} - ${dia})`;
-
-        const { error } = await supa.from('turmas').update({
-            identificador: novoIdentificador,
-            dia_semana: dia,
-            turno: turno,
-            instrutor: instrutor,
-            vagas_limite: vagas,
-            data_inicio: dataInicio,
-            data_fim: dataFim
-        }).eq('id', idTurmaEdicao);
+        const { error } = await supa.from('turmas').update({ identificador: novoIdentificador, dia_semana: dia, turno: turno, instrutor: instrutor, vagas_limite: vagas, data_inicio: dataInicio, data_fim: dataFim }).eq('id', idTurmaEdicao);
 
         if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
 
         alert("Turma atualizada com sucesso!");
-        document.getElementById('form-editar-turma').style.display = 'none';
-        idTurmaEdicao = null;
-        await carregarDashboard();
+        fecharEdicaoTurma(); await carregarDashboard();
     }
 
-    async function alterarStatusTurma(id, novoStatus) {
+    async function alterarStatusTurmaDetalhe(id, novoStatus) {
         if (!verificarPermissaoAdmin()) return;
         if(!confirm(`Confirma a alteração do status da turma para '${novoStatus}'? Ela não aparecerá mais no dashboard.`)) return;
         await supa.from('turmas').update({ status: novoStatus }).eq('id', id);
-        carregarDashboard();
+        voltarDashboard();
     }
 
     async function abrirTurmasInativas() {
         if (!verificarPermissaoAdmin()) return;
         fecharTodosFormulariosAdmin();
         document.getElementById('painel-turmas-inativas').style.display = 'block';
-        
         const tbody = document.getElementById('tbody-turmas-inativas');
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">A pesquisar turmas inativas...</td></tr>';
         
         const { data, error } = await supa.from('turmas').select('id, identificador, curso_nome').eq('status', 'Inativo').order('curso_nome');
-        
         if (error || !data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nenhuma turma inativa encontrada.</td></tr>';
             return;
@@ -656,161 +624,199 @@
         
         tbody.innerHTML = '';
         data.forEach(t => {
-            tbody.innerHTML += `<tr>
-                <td>${t.curso_nome}</td>
-                <td>${t.identificador}</td>
-                <td style="text-align:center;">
-                    <button class="btn btn-secondary btn-sm" onclick="reativarTurma('${t.id}')">🔄 Reativar</button>
-                </td>
-            </tr>`;
+            tbody.innerHTML += `<tr><td>${t.curso_nome}</td><td>${t.identificador}</td><td style="text-align:center;"><button class="btn btn-secondary btn-sm" onclick="reativarTurma('${t.id}')">🔄 Reativar</button></td></tr>`;
         });
     }
 
     async function reativarTurma(id) {
         if (!verificarPermissaoAdmin()) return;
         await supa.from('turmas').update({ status: 'Ativo' }).eq('id', id);
-        abrirTurmasInativas();
-        carregarDashboard();
+        abrirTurmasInativas(); carregarDashboard();
     }
 
-    async function alternarMatriculasTurma(id, bloqueadaAtual) {
+    async function alternarMatriculasTurmaDetalhe(id, bloqueadaAtual) {
         if (!verificarPermissaoAdmin()) return;
         const novoEstado = !bloqueadaAtual;
         const msg = novoEstado ? 'BLOQUEAR o recebimento de novos alunos' : 'LIBERAR o recebimento de novos alunos';
-        
         if(!confirm(`Confirma que deseja ${msg} para esta turma?`)) return;
         
         const { error } = await supa.from('turmas').update({ matriculas_bloqueadas: novoEstado }).eq('id', id);
         if(error) { alert("Erro ao alterar bloqueio: " + error.message); return; }
         
-        carregarDashboard();
+        await carregarDashboard();
     }
 
-    // --- FUNÇÕES DE VINCULAÇÃO E LISTA DE ESPERA ---
+    // --- CARREGAMENTO DADOS BASE ---
+    async function fetchDados() {
+        const [resCursos, resTurmas, resAlunos, resInstrutores] = await Promise.all([
+            supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
+            supa.from('turmas').select('*').neq('status', 'Inativo').order('curso_nome'),
+            supa.from('alunos_ccp').select('cpf, nome, cursos, data_cadastro'),
+            supa.from('instrutores').select('id, nome').order('nome')
+        ]);
 
-    async function gerenciarListaEspera(cursoNome) {
-        fecharTodosFormulariosAdmin();
-        document.getElementById('painel-alunos-turma').style.display = 'none';
-        document.getElementById('painel-lista-espera').style.display = 'block';
-        document.getElementById('titulo-lista-espera').innerText = `📋 Lista de Espera: ${cursoNome}`;
-        
-        const tbody = document.getElementById('tbody-lista-espera');
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A pesquisar na fila...</td></tr>';
-        
-        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
-        const { data: alunos, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos, data_cadastro').like('cursos', `%${stringEspera}%`);
-        
-        if (error) { tbody.innerHTML = '<tr><td colspan="4">Erro na busca de alunos em espera.</td></tr>'; return; }
-        if (!alunos || alunos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A lista de espera para este curso está vazia.</td></tr>';
-            return;
+        if (resCursos.error || resTurmas.error || resAlunos.error) {
+            alert("Falha de comunicação com a base de dados ao atualizar métricas.");
+            return false;
         }
 
-        alunos.sort((a, b) => {
-            let dataA = new Date(0);
-            let dataB = new Date(0);
+        cursosMemoria = resCursos.data;
+        turmasMemoria = resTurmas.data;
+        alunosMemoria = resAlunos.data;
+        instrutoresMemoria = resInstrutores.data || [];
+        
+        atualizarSelectInstrutores();
+        return true;
+    }
 
-            if (a.data_cadastro && a.data_cadastro.includes('/')) {
-                const [dia, mes, ano] = a.data_cadastro.split('/');
-                dataA = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+    async function carregarDashboard() {
+        const container = document.getElementById('dashboard-container');
+        if(!idTurmaAberta) container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">A processar métricas...</p>';
+
+        const sucesso = await fetchDados();
+        if(!sucesso) return;
+
+        // Renderiza Dashboard Simplificado
+        let htmlFinal = '';
+        if(cursosMemoria.length === 0) {
+            htmlFinal = '<p style="text-align: center; color: var(--text-muted);">Nenhum curso ativo localizado.</p>';
+        }
+
+        cursosMemoria.forEach(curso => {
+            const turmasDoCurso = turmasMemoria.filter(t => t.curso_nome === curso.nome);
+            const strEspera = `${curso.nome} [Pendente/Lista de Espera]`;
+            const qtdEspera = alunosMemoria.filter(a => a.cursos && a.cursos.includes(strEspera)).length;
+
+            htmlFinal += `
+            <div class="curso-simplified-block">
+                <div class="curso-simplified-header">
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        📚 ${curso.nome} 
+                        <span style="font-size: 10pt; color: var(--text-muted); font-weight: normal; background: var(--bg-card); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">
+                            ⏳ ${curso.carga_horaria ? curso.carga_horaria + 'h' : 'N/I'}
+                        </span>
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${qtdEspera > 0 ? `<span class="badge badge-espera" style="margin-right:10px;">${qtdEspera} na Lista de Espera</span>` : ''}
+                        <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${curso.id}')">✏️ Editar Curso</button>
+                        <button class="btn btn-danger btn-sm admin-only" onclick="desativarCurso('${curso.id}')">🗑️ Desativar</button>
+                    </div>
+                </div>`;
+
+            if(turmasDoCurso.length === 0) {
+                htmlFinal += `<p style="font-size: 10pt; color: var(--text-muted); margin: 0;">Sem turmas ativas vinculadas.</p>`;
+            } else {
+                htmlFinal += `<div class="turma-grid">`;
+                turmasDoCurso.forEach(turma => {
+                    const stringBuscaMatricula = `${curso.nome} [${turma.identificador}]`;
+                    let contagemMatriculados = 0;
+
+                    alunosMemoria.forEach(aluno => {
+                        if (aluno.cursos) {
+                            const cursosAluno = aluno.cursos.split(' | ').map(c => c.trim());
+                            if (cursosAluno.includes(stringBuscaMatricula)) contagemMatriculados++;
+                        }
+                    });
+
+                    const isBloqueada = turma.matriculas_bloqueadas === true;
+                    
+                    // Lógica de Cores da Lotação (Abaixo = Verde, Ideal = Azul, Acima = Vermelho)
+                    let classeVagas = '';
+                    if (contagemMatriculados > turma.vagas_limite) {
+                        classeVagas = 'excedida';
+                    } else if (contagemMatriculados === turma.vagas_limite) {
+                        classeVagas = 'ideal';
+                    } else {
+                        classeVagas = 'disponivel';
+                    }
+                    
+                    const badgeTrava = isBloqueada ? `<span class="badge badge-status badge-bloqueada">Fechada</span>` : '';
+
+                    htmlFinal += `
+                    <div class="turma-card ${isBloqueada ? 'bloqueada' : ''}" onclick="abrirDetalhesTurma('${turma.id}')">
+                        <div class="turma-card-header">
+                            <span class="turma-card-title">${turma.identificador}</span>
+                            ${badgeTrava}
+                        </div>
+                        <div class="turma-card-subtitle">${turma.dia_semana} - ${turma.turno}</div>
+                        <div class="turma-card-stats">
+                            <span class="badge badge-vagas ${classeVagas}">${contagemMatriculados}/${turma.vagas_limite} Alunos</span>
+                        </div>
+                    </div>`;
+                });
+                htmlFinal += `</div>`;
             }
-
-            if (b.data_cadastro && b.data_cadastro.includes('/')) {
-                const [dia, mes, ano] = b.data_cadastro.split('/');
-                dataB = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-            }
-
-            return dataA - dataB;
+            htmlFinal += `</div>`;
         });
 
-        const { data: turmas } = await supa.from('turmas').select('identificador, matriculas_bloqueadas').eq('curso_nome', cursoNome).neq('status', 'Inativo');
+        container.innerHTML = htmlFinal;
+
+        // Se uma turma estiver aberta em detalhes, recarregamos as views dela
+        if(idTurmaAberta) {
+            abrirDetalhesTurma(idTurmaAberta, true);
+        }
+    }
+
+    // --- VISÃO DETALHADA DA TURMA (UNIFICADA) ---
+    function voltarDashboard() {
+        idTurmaAberta = null;
+        document.getElementById('view-detalhes-turma').style.display = 'none';
+        document.getElementById('view-dashboard').style.display = 'block';
+        carregarDashboard(); // Refresh final para garantir alinhamento dos cards caso haja mutação
+    }
+
+    function abrirDetalhesTurma(idTurma, isRefresh = false) {
+        const turma = turmasMemoria.find(t => t.id === idTurma);
+        if(!turma) { alert("Turma não localizada."); voltarDashboard(); return; }
         
-        let opcoesTurma = '<option value="">Selecione a Turma...</option>';
-        if (turmas) {
-            turmas.forEach(t => {
-                const statusText = t.matriculas_bloqueadas ? ' (Matrículas Bloqueadas)' : '';
-                opcoesTurma += `<option value="${t.identificador}">${t.identificador}${statusText}</option>`;
-            });
+        const curso = cursosMemoria.find(c => c.nome === turma.curso_nome);
+        if(!curso) return;
+
+        idTurmaAberta = idTurma;
+        currentGerenciamentoCurso = curso.nome;
+        currentGerenciamentoIdentificador = turma.identificador;
+
+        if(!isRefresh) {
+            document.getElementById('view-dashboard').style.display = 'none';
+            document.getElementById('view-detalhes-turma').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        tbody.innerHTML = '';
-        alunos.forEach(aluno => {
-            tbody.innerHTML += `<tr>
-                <td><strong>${aluno.nome}</strong></td>
-                <td>${aluno.cpf}</td>
-                <td>
-                    <select class="operacional-only" id="turma-destino-${aluno.cpf}" style="width: 100%; padding: 6px;">
-                        ${opcoesTurma}
-                    </select>
-                </td>
-                <td style="text-align:center;">
-                    <button class="btn btn-secondary btn-sm operacional-only" onclick="promoverAlunoEspera('${aluno.cpf}', '${cursoNome}')">Tornar Titular</button>
-                </td>
-            </tr>`;
-        });
-        window.scrollTo({ top: document.getElementById('painel-lista-espera').offsetTop, behavior: 'smooth' });
+        // Atualizar Cabeçalho (Alterado conforme correção visual)
+        document.getElementById('detalhes-turma-titulo').innerHTML = `${curso.nome} <span style="color:var(--text-main);">[${turma.identificador}]</span>`;
+        document.getElementById('detalhes-turma-subtitulo').innerHTML = `Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}`;
+
+        // Atualizar Botões de Ação
+        const isBloqueada = turma.matriculas_bloqueadas === true;
+        const containerAcoes = document.getElementById('detalhes-turma-acoes');
+        containerAcoes.innerHTML = `
+            <button class="btn ${!isBloqueada ? 'btn-warning' : 'btn-secondary'} btn-sm admin-only" onclick="alternarMatriculasTurmaDetalhe('${turma.id}', ${isBloqueada})">${!isBloqueada ? '🔒 Bloquear Matrículas' : '🔓 Liberar Matrículas'}</button>
+            <button class="btn btn-secondary btn-sm" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir Diário</button>
+            <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar Turma</button>
+            <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurmaDetalhe('${turma.id}', 'Inativo')">🗑️ Desativar Turma</button>
+        `;
+
+        gerenciarAlunosTurmaMemoria(curso.nome, turma.identificador);
+        gerenciarListaEsperaMemoria(curso.nome);
     }
 
-    async function promoverAlunoEspera(cpf, cursoNome) {
-        if (!verificarPermissaoEscrita()) return;
-        const select = document.getElementById(`turma-destino-${cpf}`);
-        const identificadorTurma = select.value;
-        
-        if(!identificadorTurma) { alert("Selecione a turma de destino para este aluno."); return; }
-
-        const { data: turmaData } = await supa.from('turmas').select('matriculas_bloqueadas').eq('curso_nome', cursoNome).eq('identificador', identificadorTurma).single();
-        if(turmaData && turmaData.matriculas_bloqueadas) {
-            if(!confirm("Atenção: A turma de destino selecionada encontra-se com matrículas bloqueadas. Confirma a promoção forçada do aluno para titular?")) return;
-        }
-
-        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
-        const stringTurma = `${cursoNome} [${identificadorTurma}]`;
-
-        const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
-        if(error || !aluno) { alert("Erro ao localizar cadastro do aluno."); return; }
-
-        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
-        cursosArray = cursosArray.map(c => c === stringEspera ? stringTurma : c);
-        const novosCursos = cursosArray.join(' | ');
-
-        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
-        if(updError) { alert("Erro ao promover aluno: " + updError.message); return; }
-
-        alert("Aluno promovido a titular com sucesso.");
-        gerenciarListaEspera(cursoNome);
-        carregarDashboard();
-    }
-
-    async function gerenciarAlunosTurma(cursoNome, identificadorTurma) {
-        currentGerenciamentoCurso = cursoNome;
-        currentGerenciamentoIdentificador = identificadorTurma;
-        
-        document.getElementById('titulo-gerenciamento-alunos').innerText = `👥 Alunos em: ${cursoNome} [${identificadorTurma}]`;
-        document.getElementById('painel-alunos-turma').style.display = 'block';
-        fecharTodosFormulariosAdmin();
-        
-        await carregarAlunosDaTurma();
-        window.scrollTo({ top: document.getElementById('painel-alunos-turma').offsetTop, behavior: 'smooth' });
-    }
-
-    async function carregarAlunosDaTurma() {
+    // --- ALUNOS VINCULADOS (Lê da Memória) ---
+    function gerenciarAlunosTurmaMemoria(cursoNome, identificadorTurma) {
+        document.getElementById('titulo-gerenciamento-alunos').innerText = `👥 Alunos Vinculados`;
         const tbody = document.getElementById('tbody-alunos-matriculados');
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">A pesquisar matriculados...</td></tr>';
         
-        const stringBusca = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
-        const { data, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').like('cursos', `%${stringBusca}%`);
-        
-        if(error) { tbody.innerHTML = '<tr><td colspan="3">Erro ao buscar alunos.</td></tr>'; return; }
+        const stringBusca = `${cursoNome} [${identificadorTurma}]`;
+        const alunosDaTurma = alunosMemoria.filter(a => a.cursos && a.cursos.includes(stringBusca));
         
         tbody.innerHTML = '';
-        if(data.length === 0) {
+        if(alunosDaTurma.length === 0) {
             tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nenhum aluno vinculado a esta turma.</td></tr>';
             return;
         }
 
         const temPermissaoMutacao = (nivelAcessoUsuario === 'Admin' || nivelAcessoUsuario === 'Operacional');
 
-        data.forEach(aluno => {
+        alunosDaTurma.forEach(aluno => {
             const cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
             const isInativo = cursosArray.includes(`${stringBusca} (INATIVO)`);
             const badgeInativo = isInativo ? ` <span style="color:var(--danger); font-size:9pt; font-weight:bold;">(Desistente)</span>` : '';
@@ -823,11 +829,83 @@
             tbody.innerHTML += `<tr>
                 <td><strong>${aluno.nome}</strong>${badgeInativo}</td>
                 <td>${aluno.cpf}</td>
-                <td style="text-align:center; white-space:nowrap;">
-                    ${acaoHtml}
+                <td style="text-align:center; white-space:nowrap;">${acaoHtml}</td>
+            </tr>`;
+        });
+    }
+
+    // --- LISTA DE ESPERA (Lê da Memória) ---
+    function gerenciarListaEsperaMemoria(cursoNome) {
+        document.getElementById('titulo-lista-espera').innerText = `📋 Lista de Espera: ${cursoNome}`;
+        const tbody = document.getElementById('tbody-lista-espera');
+        
+        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
+        const alunosNaEspera = alunosMemoria.filter(a => a.cursos && a.cursos.includes(stringEspera));
+        
+        if (alunosNaEspera.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A lista de espera para este curso está vazia.</td></tr>';
+            return;
+        }
+
+        alunosNaEspera.sort((a, b) => {
+            let dataA = new Date(0), dataB = new Date(0);
+            if (a.data_cadastro && a.data_cadastro.includes('/')) {
+                const [dia, mes, ano] = a.data_cadastro.split('/'); dataA = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+            }
+            if (b.data_cadastro && b.data_cadastro.includes('/')) {
+                const [dia, mes, ano] = b.data_cadastro.split('/'); dataB = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+            }
+            return dataA - dataB;
+        });
+
+        const turmasDoCurso = turmasMemoria.filter(t => t.curso_nome === cursoNome);
+        let opcoesTurma = '<option value="">Selecione a Turma...</option>';
+        turmasDoCurso.forEach(t => {
+            const statusText = t.matriculas_bloqueadas ? ' (Matrículas Bloqueadas)' : '';
+            opcoesTurma += `<option value="${t.identificador}">${t.identificador}${statusText}</option>`;
+        });
+
+        tbody.innerHTML = '';
+        alunosNaEspera.forEach(aluno => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${aluno.nome}</strong></td>
+                <td>${aluno.cpf}</td>
+                <td>
+                    <select class="operacional-only" id="turma-destino-${aluno.cpf}" style="width: 100%; padding: 6px;">${opcoesTurma}</select>
+                </td>
+                <td style="text-align:center;">
+                    <button class="btn btn-secondary btn-sm operacional-only" onclick="promoverAlunoEspera('${aluno.cpf}', '${cursoNome}')">Tornar Titular</button>
                 </td>
             </tr>`;
         });
+    }
+
+    async function promoverAlunoEspera(cpf, cursoNome) {
+        if (!verificarPermissaoEscrita()) return;
+        const select = document.getElementById(`turma-destino-${cpf}`);
+        const identificadorTurma = select.value;
+        if(!identificadorTurma) { alert("Selecione a turma de destino para este aluno."); return; }
+
+        const turmaSelec = turmasMemoria.find(t => t.curso_nome === cursoNome && t.identificador === identificadorTurma);
+        if(turmaSelec && turmaSelec.matriculas_bloqueadas) {
+            if(!confirm("Atenção: A turma de destino selecionada encontra-se com matrículas bloqueadas. Confirma a promoção forçada do aluno para titular?")) return;
+        }
+
+        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
+        const stringTurma = `${cursoNome} [${identificadorTurma}]`;
+
+        const aluno = alunosMemoria.find(a => a.cpf === cpf);
+        if(!aluno) return alert("Erro ao localizar cadastro do aluno na memória.");
+
+        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
+        cursosArray = cursosArray.map(c => c === stringEspera ? stringTurma : c);
+        const novosCursos = cursosArray.join(' | ');
+
+        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
+        if(updError) { alert("Erro ao promover aluno: " + updError.message); return; }
+
+        alert("Aluno promovido a titular com sucesso.");
+        await carregarDashboard();
     }
 
     async function alternarStatusAlunoTurma(cpf, isInativo) {
@@ -835,26 +913,23 @@
         const acaoMsg = isInativo ? "reativar" : "inativar (marcar como desistente)";
         if(!confirm(`Confirma que deseja ${acaoMsg} o vínculo deste aluno com a turma?`)) return;
         
-        const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
-        if(error || !aluno) return alert("Erro ao localizar cadastro.");
+        const aluno = alunosMemoria.find(a => a.cpf === cpf);
+        if(!aluno) return alert("Erro ao localizar cadastro.");
 
         const stringTurmaBase = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
         const stringTurmaInativa = `${stringTurmaBase} (INATIVO)`;
         
         let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
-        
         if (isInativo) {
             cursosArray = cursosArray.map(c => c === stringTurmaInativa ? stringTurmaBase : c);
         } else {
             cursosArray = cursosArray.map(c => c === stringTurmaBase ? stringTurmaInativa : c);
         }
-        
         const novosCursos = cursosArray.join(' | ');
 
         const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
         if(updError) return alert("Falha ao atualizar status: " + updError.message);
 
-        await carregarAlunosDaTurma();
         await carregarDashboard();
     }
 
@@ -864,7 +939,6 @@
         if(!inputVal) return alert("Selecione ou digite o nome/CPF do aluno.");
 
         let cpfBusca = "";
-        
         if(inputVal.includes(" - ")) {
             cpfBusca = inputVal.split(" - ")[1].trim();
         } else {
@@ -879,21 +953,30 @@
 
         if(!cpfBusca) return alert("Não foi possível identificar o CPF do aluno. Selecione-o na lista suspensa.");
 
-        const { data: aluno, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').eq('cpf', cpfBusca).single();
-        if(error || !aluno) return alert("Aluno não localizado no banco de dados da nuvem.");
+        const { data: alunoFetch, error } = await supa.from('alunos_ccp').select('cpf, nome, cursos').eq('cpf', cpfBusca).single();
+        if(error || !alunoFetch) return alert("Aluno não localizado no banco de dados da nuvem.");
 
         let stringTurma = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
         
-        const { data: turmaData } = await supa.from('turmas').select('vagas_limite, matriculas_bloqueadas').eq('curso_nome', currentGerenciamentoCurso).eq('identificador', currentGerenciamentoIdentificador).single();
-        if (turmaData) {
-            if (turmaData.matriculas_bloqueadas) {
+        const turmaSelec = turmasMemoria.find(t => t.curso_nome === currentGerenciamentoCurso && t.identificador === currentGerenciamentoIdentificador);
+        if (turmaSelec) {
+            if (turmaSelec.matriculas_bloqueadas) {
                 alert("Ação impedida: Esta turma encontra-se com matrículas bloqueadas.");
                 return;
             }
-
-            const { count } = await supa.from('alunos_ccp').select('cpf', { count: 'exact', head: true }).like('cursos', `%${stringTurma}%`);
-            if (count >= turmaData.vagas_limite) {
-                const msgEspera = `A turma atingiu a capacidade máxima de ${turmaData.vagas_limite} vagas.\n\nEstá de acordo em inserir o aluno na Lista de Espera?`;
+            const { data: contagemData } = await supa.from('alunos_ccp').select('cursos').like('cursos', `%${stringTurma}%`);
+            let countVagas = 0;
+            if (contagemData) {
+                contagemData.forEach(a => {
+                    if (a.cursos) {
+                        const cArr = a.cursos.split(' | ').map(c => c.trim());
+                        if (cArr.includes(stringTurma)) countVagas++;
+                    }
+                });
+            }
+            
+            if (countVagas >= turmaSelec.vagas_limite) {
+                const msgEspera = `A turma atingiu a capacidade máxima de ${turmaSelec.vagas_limite} vagas.\n\nEstá de acordo em inserir o aluno na Lista de Espera?`;
                 if(confirm(msgEspera)) {
                     stringTurma = `${currentGerenciamentoCurso} [Pendente/Lista de Espera]`;
                 } else {
@@ -902,20 +985,18 @@
             }
         }
 
-        let cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
-        
+        let cursosArray = alunoFetch.cursos ? alunoFetch.cursos.split(' | ').map(c => c.trim()) : [];
         if (cursosArray.includes(stringTurma) || cursosArray.includes(`${stringTurma} (INATIVO)`)) {
-            return alert("O aluno " + aluno.nome + " já possui vínculo com esta turma ou status.");
+            return alert("O aluno " + alunoFetch.nome + " já possui vínculo com esta turma ou status.");
         }
 
-        let cursosAtuais = aluno.cursos ? aluno.cursos.trim() : "";
+        let cursosAtuais = alunoFetch.cursos ? alunoFetch.cursos.trim() : "";
         cursosAtuais = (cursosAtuais === "") ? stringTurma : `${cursosAtuais} | ${stringTurma}`;
 
-        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: cursosAtuais }).eq('cpf', aluno.cpf);
+        const { error: updError } = await supa.from('alunos_ccp').update({ cursos: cursosAtuais }).eq('cpf', alunoFetch.cpf);
         if(updError) return alert("Falha na vinculação no Supabase: " + updError.message);
 
         document.getElementById('input-vinculo-aluno').value = '';
-        await carregarAlunosDaTurma(); 
         await carregarDashboard(); 
     }
 
@@ -923,8 +1004,8 @@
         if (!verificarPermissaoEscrita()) return;
         if(!confirm("Deseja remover este aluno desta turma?")) return;
         
-        const { data: aluno, error } = await supa.from('alunos_ccp').select('cursos').eq('cpf', cpf).single();
-        if(error || !aluno) return alert("Erro ao localizar cadastro.");
+        const aluno = alunosMemoria.find(a => a.cpf === cpf);
+        if(!aluno) return alert("Erro ao localizar cadastro.");
 
         const stringTurmaBase = `${currentGerenciamentoCurso} [${currentGerenciamentoIdentificador}]`;
         const stringTurmaInativa = `${stringTurmaBase} (INATIVO)`;
@@ -936,13 +1017,10 @@
         const { error: updError } = await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', cpf);
         if(updError) return alert("Falha ao desvincular: " + updError.message);
 
-        await carregarAlunosDaTurma();
         await carregarDashboard();
     }
 
-    // --- CARREGAMENTO DO SISTEMA ---
-
-    async function atualizarSelectCursos() {
+    function atualizarSelectCursos() {
         const select = document.getElementById('nova-turma-curso');
         select.innerHTML = '<option value="">Selecione o Curso...</option>';
         cursosMemoria.forEach(c => { select.innerHTML += `<option value="${c.nome}">${c.nome}</option>`; });
@@ -954,9 +1032,7 @@
         
         let options = '<option value="">Selecione o Instrutor...</option>';
         if (instrutoresMemoria && instrutoresMemoria.length > 0) {
-            instrutoresMemoria.forEach(inst => {
-                options += `<option value="${inst.nome}">${inst.nome}</option>`;
-            });
+            instrutoresMemoria.forEach(inst => { options += `<option value="${inst.nome}">${inst.nome}</option>`; });
         } else {
             options = '<option value="">Nenhum instrutor cadastrado</option>';
         }
@@ -965,114 +1041,9 @@
         if (selectEdit) selectEdit.innerHTML = options;
     }
 
-    async function carregarDashboard() {
-        const container = document.getElementById('dashboard-container');
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">A processar métricas...</p>';
-
-        const [resCursos, resTurmas, resAlunos, resInstrutores] = await Promise.all([
-            supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
-            supa.from('turmas').select('*').neq('status', 'Inativo').order('curso_nome'),
-            supa.from('alunos_ccp').select('cursos'),
-            supa.from('instrutores').select('id, nome').order('nome')
-        ]);
-
-        if (resCursos.error || resTurmas.error || resAlunos.error) {
-            container.innerHTML = '<p style="color: var(--danger);">Falha de comunicação com a base de dados.</p>';
-            return;
-        }
-
-        cursosMemoria = resCursos.data;
-        instrutoresMemoria = resInstrutores.data || [];
-        
-        atualizarSelectInstrutores();
-
-        const turmas = resTurmas.data;
-        const alunos = resAlunos.data;
-
-        let htmlFinal = '';
-
-        if(cursosMemoria.length === 0) {
-            htmlFinal = '<p style="text-align: center; color: var(--text-muted);">Nenhum curso ativo localizado.</p>';
-        }
-
-        cursosMemoria.forEach(curso => {
-            const turmasDoCurso = turmas.filter(t => t.curso_nome === curso.nome);
-            
-            htmlFinal += `
-            <div class="curso-block">
-                <div class="curso-header">
-                    <span style="display: flex; align-items: center; gap: 10px;">
-                        📚 ${curso.nome} 
-                        <span style="font-size: 10pt; color: var(--text-muted); font-weight: normal; background: var(--bg-card); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">
-                            ⏳ ${curso.carga_horaria ? curso.carga_horaria + 'h' : 'N/I'}
-                        </span>
-                    </span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <button class="btn btn-secondary btn-sm operacional-only" onclick="gerenciarListaEspera('${curso.nome}')">📋 Lista de Espera</button>
-                        <span style="font-size: 11pt; color: var(--text-muted); font-weight: normal; margin-left: 10px;">${turmasDoCurso.length} Turma(s)</span>
-                        <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${curso.id}')">✏️ Editar Curso</button>
-                        <button class="btn btn-danger btn-sm admin-only" onclick="desativarCurso('${curso.id}')">🗑️ Desativar</button>
-                    </div>
-                </div>`;
-
-            if(turmasDoCurso.length === 0) {
-                htmlFinal += `<p style="font-size: 10pt; color: var(--text-muted); margin: 0;">Sem turmas ativas no momento.</p>`;
-            } else {
-                turmasDoCurso.forEach(turma => {
-                    const stringBuscaMatricula = `${curso.nome} [${turma.identificador}]`;
-                    let contagemMatriculados = 0;
-
-                    alunos.forEach(aluno => {
-                        if (aluno.cursos) {
-                            const cursosAluno = aluno.cursos.split(' | ').map(c => c.trim());
-                            if (cursosAluno.includes(stringBuscaMatricula)) contagemMatriculados++;
-                        }
-                    });
-
-                    const isBloqueada = turma.matriculas_bloqueadas === true;
-                    const taxaOcupacao = (contagemMatriculados / turma.vagas_limite) * 100;
-                    const preenchimento = taxaOcupacao > 100 ? 100 : taxaOcupacao;
-                    
-                    const classTravaMatricula = isBloqueada ? 'color: var(--warning);' : 'color: var(--secondary);';
-                    const indicativoFechado = isBloqueada ? ' <span style="color:var(--warning); font-size:9pt; font-weight:bold;">[MATRÍCULAS BLOQUEADAS]</span>' : '';
-                    const classeVagas = contagemMatriculados >= turma.vagas_limite ? 'vagas-cheia' : (isBloqueada ? 'vagas-cheia' : 'vagas-disponiveis');
-
-                    htmlFinal += `
-                    <div class="turma-row" style="${isBloqueada ? 'border-color: var(--warning);' : ''}">
-                        <div class="turma-info">
-                            <span class="turma-nome">${turma.identificador}${indicativoFechado}</span>
-                            <span class="turma-detalhes">Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}</span>
-                            <div style="margin-top: 8px; display:flex; gap:6px;">
-                                <button class="btn btn-secondary btn-sm" style="background:#23324c;" onclick="gerenciarAlunosTurma('${curso.nome}', '${turma.identificador}')">👥 Alunos</button>
-                                <button class="btn ${!isBloqueada ? 'btn-warning' : 'btn-secondary'} btn-sm admin-only" style="background: ${!isBloqueada ? '#f59e0b' : '#10b981'};" onclick="alternarMatriculasTurma('${turma.id}', ${isBloqueada})">${!isBloqueada ? '🔒 Bloquear Matr.' : '🔓 Liberar Matr.'}</button>
-                                <button class="btn btn-secondary btn-sm" style="background:#4b5563;" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir</button>
-                                <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar</button>
-                                <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurma('${turma.id}', 'Inativo')">🗑️ Desativar</button>
-                            </div>
-                        </div>
-                        <div class="vagas-box">
-                            <span class="vagas-count ${classeVagas}">${contagemMatriculados} / ${turma.vagas_limite}</span>
-                            <span style="font-size: 9pt; color: var(--text-muted);">Vagas Ocupadas</span>
-                            <div class="progress-bar">
-                                <div class="progress-fill ${contagemMatriculados >= turma.vagas_limite ? 'full' : ''}" style="width: ${preenchimento}%; ${isBloqueada ? 'background: var(--warning);' : ''}"></div>
-                            </div>
-                        </div>
-                    </div>`;
-                });
-            }
-            htmlFinal += `</div>`;
-        });
-
-        container.innerHTML = htmlFinal;
-    }
-
     async function imprimirDiario(cursoNome, identificadorTurma, instrutor, turno, dia) {
         const stringBusca = `${cursoNome} [${identificadorTurma}]`;
-        
-        const { data: alunos, error } = await supa.from('alunos_ccp')
-            .select('nome, cursos')
-            .like('cursos', `%${stringBusca}%`)
-            .order('nome');
+        const { data: alunos, error } = await supa.from('alunos_ccp').select('nome, cursos').like('cursos', `%${stringBusca}%`).order('nome');
 
         let listaAlunosHtml = '';
         if (!error && alunos && alunos.length > 0) {
@@ -1083,21 +1054,11 @@
             });
             
             alunosFiltrados.forEach((aluno, index) => {
-                listaAlunosHtml += `
-                <tr>
-                    <td class="col-num">${index + 1}</td>
-                    <td class="col-nome">${aluno.nome}</td>
-                    ${Array.from({length: 31}).map(() => '<td class="col-dia"></td>').join('')}
-                </tr>`;
+                listaAlunosHtml += `<tr><td class="col-num">${index + 1}</td><td class="col-nome">${aluno.nome}</td>${Array.from({length: 31}).map(() => '<td class="col-dia"></td>').join('')}</tr>`;
             });
             
             for (let i = alunosFiltrados.length; i < 20; i++) {
-                listaAlunosHtml += `
-                <tr>
-                    <td class="col-num">${i + 1}</td>
-                    <td class="col-nome"></td>
-                    ${Array.from({length: 31}).map(() => '<td class="col-dia"></td>').join('')}
-                </tr>`;
+                listaAlunosHtml += `<tr><td class="col-num">${i + 1}</td><td class="col-nome"></td>${Array.from({length: 31}).map(() => '<td class="col-dia"></td>').join('')}</tr>`;
             }
         } else {
             listaAlunosHtml = `<tr><td colspan="33" style="text-align:center;">Nenhum aluno matriculado nesta turma.</td></tr>`;
@@ -1106,7 +1067,6 @@
         const dataAtual = new Date();
         const mesAno = `${String(dataAtual.getMonth() + 1).padStart(2, '0')}/${dataAtual.getFullYear()}`;
         const nomeTurmaLimpo = identificadorTurma.split(' (')[0];
-
         const caminhoCenario = window.location.href.split('?')[0].split('#')[0];
         const caminhoBase = caminhoCenario.substring(0, caminhoCenario.lastIndexOf('/') + 1);
         const urlLogo = caminhoBase + 'image_773d3e.png';
@@ -1122,38 +1082,24 @@
                 body { font-family: 'Times New Roman', Times, serif; margin: 0; padding: 15px; font-size: 11pt; color: #000; }
                 .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
                 .logo-header { max-height: 80px; max-width: 100%; height: auto; }
-                
                 .info-bar { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; font-size: 10pt; }
-                
                 table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
                 th, td { border: 1px solid #000; padding: 4px; text-align: center; }
                 th { background-color: #f2f2f2; font-size: 9pt; }
-                
                 .col-nome { text-align: left; width: 250px; font-size: 10pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 5px; }
                 .col-num { width: 25px; font-size: 9pt; }
                 th.col-dia, td.col-dia { width: 20px; min-width: 20px; max-width: 20px; text-align: center; padding: 2px; }
-                
                 .legenda { font-size: 9pt; text-align: left; font-weight: bold; margin-top: 5px; }
-                
-                /* Estilos Planejamento Semanal */
                 .page-break { page-break-before: always; }
                 .plan-header { text-align: center; margin: 20px 0; font-size: 13pt; font-weight: bold; text-decoration: underline; }
                 .plan-info { display: flex; justify-content: space-between; font-size: 11pt; margin-bottom: 10px; }
                 .plan-table th { background-color: #e0e0e0; font-size: 10pt; text-transform: uppercase; }
                 .plan-table td { height: 90px; vertical-align: top; text-align: left; padding: 8px; font-size: 10pt; }
-                
-                @media print {
-                    @page { size: landscape; margin: 10mm; }
-                    body { padding: 0; }
-                    .page-break { page-break-before: always; }
-                }
+                @media print { @page { size: landscape; margin: 10mm; } body { padding: 0; } .page-break { page-break-before: always; } }
             </style>
         </head>
         <body>
-            <div class="header-container">
-                <img src="${urlLogo}" alt="Prefeitura de Iguaba Grande" class="logo-header">
-            </div>
-            
+            <div class="header-container"><img src="${urlLogo}" alt="Prefeitura de Iguaba Grande" class="logo-header"></div>
             <div class="info-bar">
                 <span>Instrutor: ${instrutor || '__________________________________'}</span>
                 <span>Disciplina: ${cursoNome}</span>
@@ -1161,32 +1107,18 @@
                 <span>Turma: ${nomeTurmaLimpo}</span>
                 <span>Turno: ${turno}</span>
             </div>
-
             <table>
                 <thead>
-                    <tr>
-                        <th rowspan="2" class="col-num">Nº</th>
-                        <th rowspan="2" style="text-align: center;">Nome dos alunos</th>
-                        <th colspan="31">Dias do Mês</th>
-                    </tr>
-                    <tr>
-                        ${Array.from({length: 31}).map((_, i) => `<th class="col-dia">${i+1}</th>`).join('')}
-                    </tr>
+                    <tr><th rowspan="2" class="col-num">Nº</th><th rowspan="2" style="text-align: center;">Nome dos alunos</th><th colspan="31">Dias do Mês</th></tr>
+                    <tr>${Array.from({length: 31}).map((_, i) => `<th class="col-dia">${i+1}</th>`).join('')}</tr>
                 </thead>
-                <tbody>
-                    ${listaAlunosHtml}
-                </tbody>
+                <tbody>${listaAlunosHtml}</tbody>
             </table>
             <div class="legenda">LEGENDA: P = Presente | F = Falta | FJ = Falta Justificada | A = Atraso</div>
 
             <div class="page-break"></div>
-
-            <div class="header-container">
-                <img src="${urlLogo}" alt="Prefeitura de Iguaba Grande" class="logo-header">
-            </div>
-            
+            <div class="header-container"><img src="${urlLogo}" alt="Prefeitura de Iguaba Grande" class="logo-header"></div>
             <div class="plan-header">Modelo Conciso de Planejamento Semanal</div>
-
             <div class="plan-info">
                 <span><strong>INSTRUTOR:</strong> ${instrutor || '________________________________________'}</span>
                 <span><strong>TURMA:</strong> ${nomeTurmaLimpo}</span>
@@ -1195,17 +1127,8 @@
                 <span><strong>OBJETIVO:</strong> ______________________________________________________________</span>
                 <span><strong>TURNO:</strong> ${turno}</span>
             </div>
-
             <table class="plan-table">
-                <thead>
-                    <tr>
-                        <th style="width: 5%;">SEMANA</th>
-                        <th style="width: 10%;">DATA (Início)</th>
-                        <th style="width: 35%;">CONTEÚDO/TEMA</th>
-                        <th style="width: 30%;">RECURSOS/ESTRATÉGIAS</th>
-                        <th style="width: 20%;">AVALIAÇÃO</th>
-                    </tr>
-                </thead>
+                <thead><tr><th style="width: 5%;">SEMANA</th><th style="width: 10%;">DATA (Início)</th><th style="width: 35%;">CONTEÚDO/TEMA</th><th style="width: 30%;">RECURSOS/ESTRATÉGIAS</th><th style="width: 20%;">AVALIAÇÃO</th></tr></thead>
                 <tbody>
                     <tr><td style="text-align:center; font-weight:bold;">1ª</td><td></td><td></td><td></td><td></td></tr>
                     <tr><td style="text-align:center; font-weight:bold;">2ª</td><td></td><td></td><td></td><td></td></tr>
@@ -1213,16 +1136,10 @@
                     <tr><td style="text-align:center; font-weight:bold;">4ª</td><td></td><td></td><td></td><td></td></tr>
                 </tbody>
             </table>
-
-            <script>
-                window.onload = function() { 
-                    setTimeout(() => { window.print(); }, 500); 
-                }
-            <\/script>
+            <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
         </body>
         </html>
         `;
-        
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     }
