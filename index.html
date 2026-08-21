@@ -328,7 +328,11 @@
 
         <!-- Painel de Lista de Espera -->
         <div class="card" id="painel-lista-espera" style="border-left: 4px solid var(--warning);">
-            <h3 id="titulo-lista-espera">📋 Lista de Espera do Curso</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 id="titulo-lista-espera" style="margin: 0; border: none; padding: 0;">📋 Lista de Espera do Curso</h3>
+                <button class="btn btn-secondary btn-sm" id="btn-imprimir-espera" style="background: #475569;" onclick="">🖨️ Imprimir Lista</button>
+            </div>
+            
             <table class="styled-table">
                 <thead>
                     <tr>
@@ -648,10 +652,11 @@
 
     // --- CARREGAMENTO DADOS BASE ---
     async function fetchDados() {
+        // Alterado para incluir telefone e email essenciais para a impressão da lista de espera
         const [resCursos, resTurmas, resAlunos, resInstrutores] = await Promise.all([
             supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
             supa.from('turmas').select('*').neq('status', 'Inativo').order('curso_nome'),
-            supa.from('alunos_ccp').select('cpf, nome, cursos, data_cadastro'),
+            supa.from('alunos_ccp').select('cpf, nome, telefone, email, cursos, data_cadastro'),
             supa.from('instrutores').select('id, nome').order('nome')
         ]);
 
@@ -782,7 +787,7 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Atualizar Cabeçalho (Alterado conforme correção visual)
+        // Atualizar Cabeçalho 
         document.getElementById('detalhes-turma-titulo').innerHTML = `${curso.nome} <span style="color:var(--text-main);">[${turma.identificador}]</span>`;
         document.getElementById('detalhes-turma-subtitulo').innerHTML = `Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}`;
 
@@ -837,8 +842,10 @@
     // --- LISTA DE ESPERA (Lê da Memória) ---
     function gerenciarListaEsperaMemoria(cursoNome) {
         document.getElementById('titulo-lista-espera').innerText = `📋 Lista de Espera: ${cursoNome}`;
+        // Atribui a função de impressão com o nome do curso correto ao botão
+        document.getElementById('btn-imprimir-espera').setAttribute('onclick', `imprimirListaEspera('${cursoNome}')`);
+
         const tbody = document.getElementById('tbody-lista-espera');
-        
         const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
         const alunosNaEspera = alunosMemoria.filter(a => a.cursos && a.cursos.includes(stringEspera));
         
@@ -1039,6 +1046,89 @@
 
         if (selectNovo) selectNovo.innerHTML = options;
         if (selectEdit) selectEdit.innerHTML = options;
+    }
+
+    function imprimirListaEspera(cursoNome) {
+        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
+        
+        const alunosNaEspera = alunosMemoria.filter(a => {
+            if (!a.cursos) return false;
+            const cursosArr = a.cursos.split(' | ').map(c => c.trim());
+            return cursosArr.includes(stringEspera);
+        });
+
+        if (alunosNaEspera.length === 0) {
+            alert("A lista de espera para este curso está vazia.");
+            return;
+        }
+
+        alunosNaEspera.sort((a, b) => {
+            let dataA = new Date(0), dataB = new Date(0);
+            if (a.data_cadastro && a.data_cadastro.includes('/')) {
+                const [dia, mes, ano] = a.data_cadastro.split('/'); dataA = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+            }
+            if (b.data_cadastro && b.data_cadastro.includes('/')) {
+                const [dia, mes, ano] = b.data_cadastro.split('/'); dataB = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+            }
+            return dataA - dataB;
+        });
+
+        let tbodyHtml = '';
+        alunosNaEspera.forEach((aluno, index) => {
+            const tel = aluno.telefone || '-';
+            const email = aluno.email || '-';
+            const dataCad = aluno.data_cadastro || '-';
+
+            tbodyHtml += `
+                <tr>
+                    <td style="text-align: center;">${index + 1}</td>
+                    <td><strong>${aluno.nome}</strong></td>
+                    <td>${tel}</td>
+                    <td>${email}</td>
+                    <td style="text-align: center;">${dataCad}</td>
+                    <td></td>
+                </tr>
+            `;
+        });
+
+        const printWindow = window.open('', '_blank');
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <title>Lista de Espera - ${cursoNome}</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10pt; }
+                th, td { border: 1px solid #000; padding: 8px 10px; text-align: left; }
+                th { background-color: #fef3c7; text-transform: uppercase; font-size: 10pt; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <h3 style="text-align: center; margin-bottom: 20px; font-weight: bold;">📋 LISTA DE ESPERA - ${cursoNome}</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 3%; text-align: center;">Nº</th>
+                        <th style="width: 25%;">Nome do Aluno</th>
+                        <th style="width: 15%;">Telefone</th>
+                        <th style="width: 25%;">E-mail</th>
+                        <th style="width: 12%; text-align: center;">Data Fila</th>
+                        <th style="width: 20%;">Observações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tbodyHtml}
+                </tbody>
+            </table>
+            <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
+        </body>
+        </html>
+        `;
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
     }
 
     async function imprimirDiario(cursoNome, identificadorTurma, instrutor, turno, dia) {
