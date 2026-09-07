@@ -1,87 +1,268 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="pt-BR" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Cursos e Turmas - CCP / SDETR</title>
+    <title>SGE CCP - Gestão de Turmas e Lotação</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* --- Variáveis Globais (Modo Escuro / Dark Mode) --- */
-        :root {
-            --bg-body: #0f172a; --bg-card: #1e293b; --bg-input: #334155;
-            --text-main: #f8fafc; --text-muted: #94a3b8; --primary: #3b82f6;
-            --primary-hover: #2563eb; --secondary: #10b981; --danger: #ef4444;
-            --warning: #f59e0b; --border: #334155; --transition: all 0.3s ease;
+        /* --- Variáveis de Tema (Design System) --- */
+        :root[data-theme="dark"] {
+            --bg-body: #090f1d;
+            --bg-gradient: radial-gradient(circle at 10% 20%, rgba(30, 58, 138, 0.25) 0%, rgba(9, 15, 29, 0.95) 75%);
+            --bg-surface: rgba(17, 27, 49, 0.85);
+            --bg-curso-bloco: rgba(17, 27, 49, 0.42);
+            --bg-surface-elevated: #1e293b;
+            --bg-input: #0b1325;
+            --border: rgba(255, 255, 255, 0.1);
+            --border-hover: rgba(59, 130, 246, 0.45);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
+            --primary-glow: rgba(56, 189, 248, 0.2);
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            --img-opacity: 0.22;
         }
 
-        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
-        body { background-color: var(--bg-body); color: var(--text-main); margin: 0; line-height: 1.5; padding: 20px 15px; }
-        .container { max-width: 1200px; margin: 0 auto; }
+        :root[data-theme="light"] {
+            --bg-body: #f8fafc;
+            --bg-gradient: radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.8) 0%, rgba(248, 250, 252, 0.95) 70%);
+            --bg-surface: rgba(255, 255, 255, 0.9);
+            --bg-curso-bloco: rgba(255, 255, 255, 0.45);
+            --bg-surface-elevated: #f1f5f9;
+            --bg-input: #ffffff;
+            --border: #cbd5e1;
+            --border-hover: #0284c7;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --primary-glow: rgba(2, 132, 199, 0.15);
+            --secondary: #059669;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --card-shadow: 0 10px 20px -5px rgba(15, 23, 42, 0.08);
+            --img-opacity: 0.18;
+        }
+
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         
-        /* --- Ecrã de Autenticação --- */
-        .login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-body); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-        .login-card { background: var(--bg-card); padding: 40px; border-radius: 12px; border: 1px solid var(--border); width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        body { 
+            background-color: var(--bg-body);
+            background-image: var(--bg-gradient);
+            color: var(--text-main); 
+            margin: 0; 
+            min-height: 100vh;
+            padding-bottom: 50px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            position: relative;
+        }
 
-        header { text-align: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 30px; }
-        header h1 { margin: 0; font-size: 22pt; color: var(--primary); }
+        /* Camada com a Imagem de Fundo Pedagógica */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url("fundo_gestao.jpg");
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            opacity: var(--img-opacity);
+            pointer-events: none;
+            z-index: 0;
+            transition: opacity 0.3s ease;
+        }
 
-        /* --- Painéis e Formulários --- */
-        .card { background: var(--bg-card); border-radius: 10px; padding: 25px; border: 1px solid var(--border); margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        h2 { font-size: 16pt; margin-top: 0; color: var(--primary); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
-        h3 { color: var(--text-main); font-size: 14pt; margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
+        .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
 
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .full-width { grid-column: 1 / -1; }
-        label { font-size: 10pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        input, select, textarea { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 6px; outline: none; font-size: 10pt; transition: var(--transition); font-family: inherit; }
-        textarea { resize: vertical; }
-        input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+        /* Login Screen */
+        .login-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-body);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+        .login-card {
+            background: var(--bg-surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .app-header {
+            background: var(--bg-surface);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content { display: flex; justify-content: space-between; align-items: center; }
+        .header-brand h1 { font-size: 1.2rem; margin: 0; font-weight: 700; letter-spacing: -0.01em; color: var(--text-main); }
+        .header-brand p { font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0 0; }
+        .header-meta { display: flex; align-items: center; gap: 12px; }
+        .badge-perfil { background: var(--bg-input); border: 1px solid var(--border); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; }
+
+        /* KPI Cards */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 28px 0; }
+        .kpi-card {
+            background: var(--bg-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--card-shadow);
+        }
+        .kpi-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 4px; }
+        .kpi-value { font-size: 1.6rem; font-weight: 800; color: var(--text-main); margin: 0; }
+        .kpi-icon { font-size: 1.8rem; opacity: 0.8; }
+
+        /* Toolbar */
+        .action-toolbar {
+            background: var(--bg-surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-bottom: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            box-shadow: var(--card-shadow);
+        }
+        .search-box { position: relative; flex: 1; min-width: 260px; }
+        .search-box input {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px 10px 38px;
+            color: var(--text-main);
+            width: 100%;
+            outline: none;
+        }
+        .search-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+        .search-box .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+
+        /* Dashboard Blocks - Balões Grandes de CURSOS com Transparência Elevada */
+        .curso-simplified-block {
+            background: var(--bg-curso-bloco);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--card-shadow);
+        }
+        .curso-simplified-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .turma-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 18px; }
         
-        /* --- Botões --- */
-        .btn { padding: 12px 15px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 10pt; }
-        .btn-primary { background: var(--primary); color: white; }
+        .turma-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 14px;
+        }
+        .turma-card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: var(--card-shadow); }
+        .turma-card.bloqueada { border-left: 4px solid var(--warning); }
+        
+        .capacity-bar { background: var(--bg-surface-elevated); height: 7px; border-radius: 99px; overflow: hidden; width: 100%; }
+        .capacity-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+
+        /* Buttons & Badges */
+        .btn {
+            padding: 9px 16px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
         .btn-primary:hover { background: var(--primary-hover); }
-        .btn-secondary { background: var(--secondary); color: white; }
-        .btn-secondary:hover { background: #0e9f6e; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-danger:hover { background: #dc2626; }
-        .btn-warning { background: var(--warning); color: white; }
-        .btn-warning:hover { background: #d97706; }
-        .btn-sm { padding: 6px 12px; font-size: 9pt; width: auto; }
+        .btn-secondary { background: var(--secondary); color: #fff; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-outline { background: transparent; border-color: var(--border); color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg-surface-elevated); border-color: var(--text-muted); }
+        .btn-sm { padding: 6px 12px; font-size: 0.78rem; }
 
-        /* --- Dashboard Simplificado (Novo) --- */
-        .curso-simplified-block { background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        .curso-simplified-header { font-size: 14pt; font-weight: bold; color: var(--primary); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
-        
-        .turma-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
-        
-        .turma-card { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; border-radius: 8px; cursor: pointer; transition: var(--transition); display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; }
-        .turma-card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .turma-card.bloqueada { border-color: var(--warning); }
-        .turma-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .turma-card-title { font-weight: bold; font-size: 12pt; color: var(--text-main); }
-        .turma-card-subtitle { font-size: 9pt; color: var(--text-muted); margin-top: 4px; }
-        .turma-card-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
-        
-        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 9pt; display: inline-block; }
-        .badge-vagas { background: var(--bg-input); color: var(--text-main); }
-        .badge-vagas.disponivel { background: rgba(16, 185, 129, 0.15); color: var(--secondary); border: 1px solid var(--secondary); }
-        .badge-vagas.ideal { background: rgba(59, 130, 246, 0.15); color: var(--primary); border: 1px solid var(--primary); }
-        .badge-vagas.excedida { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid var(--danger); }
-        .badge-espera { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid var(--warning); }
-        .badge-status { font-size: 8pt; padding: 2px 6px; }
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; border: 1px solid transparent; }
+        .badge-disponivel { background: rgba(16, 185, 129, 0.15); color: var(--secondary); border-color: rgba(16, 185, 129, 0.3); }
+        .badge-ideal { background: rgba(2, 132, 199, 0.15); color: var(--primary); border-color: rgba(2, 132, 199, 0.3); }
+        .badge-excedida { background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: rgba(239, 68, 68, 0.3); }
+        .badge-espera { background: rgba(245, 158, 11, 0.15); color: var(--warning); border-color: rgba(245, 158, 11, 0.3); }
+        .badge-bloqueada { background: rgba(245, 158, 11, 0.25); color: var(--warning); border-color: var(--warning); }
 
-        /* --- Tabelas Administrativas --- */
-        .styled-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
-        .styled-table th { background: var(--bg-input); color: var(--primary); font-weight: bold; text-align: left; padding: 10px; border-bottom: 2px solid var(--border); }
-        .styled-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+        /* Tables & Cards */
+        .card { background: var(--bg-surface); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: var(--card-shadow); }
+        .table-container { width: 100%; overflow-x: auto; }
+        .styled-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+        .styled-table th { background: var(--bg-surface-elevated); color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em; padding: 12px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+        .styled-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text-main); }
+        .styled-table tbody tr:hover { background-color: rgba(125, 125, 125, 0.05); }
 
-        /* --- Restrição de Acesso --- */
-        .admin-only { display: none !important; }
+        /* Modals */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px);
+            display: none; justify-content: center; align-items: center; z-index: 1000; padding: 20px;
+        }
+        .modal-card {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: 16px;
+            width: 100%; max-width: 600px; padding: 28px; box-shadow: var(--card-shadow); max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--text-main); }
+        
+        /* Form fields */
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+        .full-width { grid-column: 1 / -1; }
+        label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+        input, select, textarea {
+            background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px;
+            border-radius: 8px; outline: none; font-size: 0.85rem; width: 100%;
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+
+        .admin-only, .operacional-only { display: none !important; }
         body.admin-mode .admin-only { display: inline-flex !important; }
-
-        .operacional-only { display: none !important; }
         body.admin-mode .operacional-only, body.operacional-mode .operacional-only { display: block !important; }
         body.admin-mode .operacional-only.btn, body.operacional-mode .operacional-only.btn { display: inline-flex !important; }
     </style>
@@ -90,263 +271,321 @@
 
 <div id="login-screen" class="login-screen">
     <div class="login-card">
-        <h2 style="border:none; justify-content:center; color: var(--primary); font-size: 18pt; margin-bottom: 20px; padding: 0;">SGE CCP - GESTÃO DE TURMAS</h2>
-        <div class="form-group" style="margin-bottom: 15px; text-align: left;">
+        <h2 style="margin: 0; font-size: 1.5rem; text-align: center; color: var(--text-main);">SGE CCP</h2>
+        <p style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 6px 0 24px 0;">Gestão de Turmas e Lotação</p>
+        <div class="form-group" style="margin-bottom: 14px;">
             <label>E-mail Institucional</label>
-            <input type="email" id="login-email" placeholder="coordenacao@iguaba.rj.gov.br">
+            <input type="email" id="login-email" placeholder="nome@iguaba.rj.gov.br">
         </div>
-        <div class="form-group" style="margin-bottom: 20px; text-align: left;">
+        <div class="form-group" style="margin-bottom: 24px;">
             <label>Palavra-passe</label>
-            <input type="password" id="login-senha" placeholder="******">
+            <input type="password" id="login-senha" placeholder="••••••••">
         </div>
-        <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="realizarLogin()">Aceder ao Sistema</button>
+        <button class="btn btn-primary" style="width: 100%;" onclick="realizarLogin()">Entrar no Sistema</button>
     </div>
 </div>
 
 <div class="container" id="main-content" style="display: none;">
-    <header>
-        <h1>COORDENAÇÃO DE CURSOS E TURMAS</h1>
-        <p style="color: var(--text-muted); margin: 5px 0 0 0; font-weight: 600;">Prefeitura de Iguaba Grande | Perfil: <span id="user-profile-display" style="color: var(--primary);"></span></p>
-        <button class="btn btn-danger btn-sm" style="margin-top: 15px;" onclick="encerrarSessao()">Terminar Sessão</button>
+    <header class="app-header">
+        <div class="header-content">
+            <div class="header-brand">
+                <h1>Coordenação Pedagógica CCP</h1>
+                <p>SDETR • Prefeitura de Iguaba Grande</p>
+            </div>
+            <div class="header-meta">
+                <button class="btn btn-outline btn-sm" onclick="alternarTemaVisual()" id="btn-alternador-tema">🌙 Modo Escuro</button>
+                <div class="badge-perfil">Operador: <span id="user-profile-display" style="color: var(--primary); font-weight: 700;">-</span></div>
+                <button class="btn btn-outline btn-sm" onclick="encerrarSessao()">Terminar Sessão</button>
+            </div>
+        </div>
     </header>
 
-    <div class="card" id="painel-admin">
-        <h2>Painel Administrativo 
-            <div style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary btn-sm admin-only" onclick="toggleForm('form-curso')">+ Novo Curso</button>
-                <button class="btn btn-primary btn-sm admin-only" onclick="toggleForm('form-turma')">+ Nova Turma</button>
-                <button class="btn btn-warning btn-sm admin-only" onclick="abrirTurmasInativas()">Turmas Inativas</button>
+    <!-- KPI Summary Row -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div>
+                <div class="kpi-label">Cursos Ativos</div>
+                <div class="kpi-value" id="kpi-total-cursos">0</div>
             </div>
-        </h2>
-
-        <div id="painel-turmas-inativas" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
-            <h3 style="color: var(--warning);">🔄 Gestão de Turmas Inativas</h3>
-            <table class="styled-table">
-                <thead><tr><th>Curso</th><th>Identificação da Turma</th><th style="width: 120px; text-align: center;">Ações</th></tr></thead>
-                <tbody id="tbody-turmas-inativas"></tbody>
-            </table>
-            <div style="margin-top: 15px; text-align: right;">
-                <button class="btn btn-danger btn-sm" onclick="document.getElementById('painel-turmas-inativas').style.display='none'">Fechar Painel</button>
-            </div>
+            <div class="kpi-icon">📚</div>
         </div>
-
-        <div id="form-curso" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
-            <h3>Cadastrar Novo Curso</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Nome Oficial do Curso</label>
-                    <input type="text" id="novo-curso-nome" placeholder="Ex: INFORMÁTICA BÁSICA">
-                </div>
-                <div class="form-group">
-                    <label>Carga Horária (Apenas Números)</label>
-                    <input type="number" id="novo-curso-carga" placeholder="Ex: 52">
-                </div>
-                <div class="form-group full-width">
-                    <label>Conteúdo Programático (Ementa para Certificado)</label>
-                    <textarea id="novo-curso-conteudo" rows="5" placeholder="1. Introdução ao tema...&#10;2. Desenvolvimento...&#10;3. Avaliação final..."></textarea>
-                </div>
+        <div class="kpi-card">
+            <div>
+                <div class="kpi-label">Turmas em Andamento</div>
+                <div class="kpi-value" id="kpi-total-turmas">0</div>
             </div>
-            <div style="margin-top: 15px; text-align: right;">
-                <button class="btn btn-secondary" onclick="salvarCurso()">Gravar Curso</button>
-            </div>
+            <div class="kpi-icon">👥</div>
         </div>
-
-        <div id="form-editar-curso" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
-            <h3 style="color: var(--warning);">✏️ Modificar Parâmetros do Curso</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Nome Oficial do Curso</label>
-                    <input type="text" id="edit-curso-nome">
-                </div>
-                <div class="form-group">
-                    <label>Carga Horária (Apenas Números)</label>
-                    <input type="number" id="edit-curso-carga">
-                </div>
-                <div class="form-group full-width">
-                    <label>Conteúdo Programático (Ementa para Certificado)</label>
-                    <textarea id="edit-curso-conteudo" rows="6"></textarea>
-                </div>
+        <div class="kpi-card">
+            <div>
+                <div class="kpi-label">Alunos Cursando</div>
+                <div class="kpi-value" id="kpi-total-matriculados" style="color: var(--secondary);">0</div>
             </div>
-            <div style="margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="btn btn-warning" onclick="atualizarCurso()">Atualizar Curso</button>
-                <button class="btn btn-danger btn-sm" onclick="fecharEdicaoCurso()">Cancelar</button>
-            </div>
+            <div class="kpi-icon">🎓</div>
         </div>
-
-        <div id="form-turma" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
-            <h3>Abrir Nova Turma</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Vincular ao Curso</label>
-                    <select id="nova-turma-curso"><option value="">Aguarde...</option></select>
-                </div>
-                <div class="form-group">
-                    <label>Identificação da Turma</label>
-                    <input type="text" id="nova-turma-nome" placeholder="Ex: Turma 01">
-                </div>
-                <div class="form-group">
-                    <label>Dia da Semana</label>
-                    <select id="nova-turma-dia">
-                        <option value="Segunda">Segunda-feira</option><option value="Terça">Terça-feira</option>
-                        <option value="Quarta">Quarta-feira</option><option value="Quinta">Quinta-feira</option>
-                        <option value="Sexta">Sexta-feira</option><option value="Sábado">Sábado</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Turno</label>
-                    <select id="nova-turma-turno">
-                        <option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Instrutor Responsável</label>
-                    <select id="nova-turma-instrutor">
-                        <option value="">Aguarde...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Limite de Vagas</label>
-                    <input type="number" id="nova-turma-vagas" value="20" min="1">
-                </div>
-                <div class="form-group">
-                    <label>Data de Início</label>
-                    <input type="date" id="nova-turma-inicio">
-                </div>
-                <div class="form-group">
-                    <label>Data de Término</label>
-                    <input type="date" id="nova-turma-fim">
-                </div>
+        <div class="kpi-card">
+            <div>
+                <div class="kpi-label">Fila de Espera Total</div>
+                <div class="kpi-value" id="kpi-total-espera" style="color: var(--warning);">0</div>
             </div>
-            <div style="margin-top: 15px; text-align: right;">
-                <button class="btn btn-primary" onclick="salvarTurma()">Gravar Turma</button>
-            </div>
-        </div>
-
-        <div id="form-editar-turma" style="display: none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
-            <h3 style="color: var(--warning);">✏️ Modificar Parâmetros da Turma</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Curso Vinculado</label>
-                    <input type="text" id="edit-turma-curso" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Identificação da Turma</label>
-                    <input type="text" id="edit-turma-nome">
-                </div>
-                <div class="form-group">
-                    <label>Dia da Semana</label>
-                    <select id="edit-turma-dia">
-                        <option value="Segunda">Segunda-feira</option><option value="Terça">Terça-feira</option>
-                        <option value="Quarta">Quarta-feira</option><option value="Quinta">Quinta-feira</option>
-                        <option value="Sexta">Sexta-feira</option><option value="Sábado">Sábado</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Turno</label>
-                    <select id="edit-turma-turno">
-                        <option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Instrutor Responsável</label>
-                    <select id="edit-turma-instrutor">
-                        <option value="">Aguarde...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Limite de Vagas</label>
-                    <input type="number" id="edit-turma-vagas" min="1">
-                </div>
-                <div class="form-group">
-                    <label>Data de Início</label>
-                    <input type="date" id="edit-turma-inicio">
-                </div>
-                <div class="form-group">
-                    <label>Data de Término</label>
-                    <input type="date" id="edit-turma-fim">
-                </div>
-            </div>
-            <div style="margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="btn btn-warning" onclick="atualizarTurma()">Atualizar Turma</button>
-                <button class="btn btn-danger btn-sm" onclick="fecharEdicaoTurma()">Cancelar</button>
-            </div>
+            <div class="kpi-icon">⏳</div>
         </div>
     </div>
 
-    <!-- WRAPPER 1: DASHBOARD SIMPLIFICADO -->
+    <!-- Action Toolbar with Search Filter -->
+    <div class="action-toolbar">
+        <div class="search-box">
+            <span class="icon">🔍</span>
+            <input type="text" id="filtro-busca-geral" placeholder="Buscar curso ou turma..." oninput="filtrarDashboardInstantaneo(this.value)">
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm admin-only" onclick="abrirModal('modal-novo-curso')">+ Novo Curso</button>
+            <button class="btn btn-primary btn-sm admin-only" onclick="abrirModal('modal-nova-turma')">+ Nova Turma</button>
+            <button class="btn btn-outline btn-sm admin-only" onclick="abrirTurmasInativas()">Turmas Inativas</button>
+        </div>
+    </div>
+
+    <!-- VIEW 1: DASHBOARD -->
     <div id="view-dashboard">
-        <div class="card">
-            <h2>Dashboard de Lotação do CCP / SDETR</h2>
-            <div id="dashboard-container" style="margin-top: 20px;">
-                <p style="text-align: center; color: var(--text-muted);">A carregar métricas da nuvem...</p>
-            </div>
+        <div id="dashboard-container">
+            <p style="text-align: center; color: var(--text-muted); padding: 50px 0;">Atualizando métricas em tempo real...</p>
         </div>
     </div>
 
-    <!-- WRAPPER 2: VISÃO DETALHADA DA TURMA -->
+    <!-- VIEW 2: VISÃO DETALHADA -->
     <div id="view-detalhes-turma" style="display: none;">
-        <!-- Cabeçalho e Ações da Turma -->
-        <div class="card" style="border-top: 4px solid var(--primary);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-                <div style="flex: 1; min-width: 300px;">
-                    <button class="btn btn-secondary btn-sm" style="background-color: var(--bg-input); color: var(--text-main); margin-bottom: 15px;" onclick="voltarDashboard()">⬅ Voltar ao Dashboard</button>
-                    <!-- A tag h2 agora tem display: block para não interferir com elementos abaixo -->
-                    <h2 id="detalhes-turma-titulo" style="border: none; padding: 0; margin: 0; color: var(--primary); display: block;">Título da Turma</h2>
-                    <!-- Subtítulo desmembrado da tag h2 para quebrar a linha corretamente -->
-                    <div id="detalhes-turma-subtitulo" style="font-size:11pt; color:var(--text-muted); margin-top:8px;"></div>
+        <div class="card" style="border-top: 3px solid var(--primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 8px;">
+                <div>
+                    <button class="btn btn-outline btn-sm" style="margin-bottom: 12px;" onclick="voltarDashboard()">← Voltar ao Painel</button>
+                    <h2 id="detalhes-turma-titulo" style="margin: 0; font-size: 1.3rem; color: var(--text-main); border: none; padding: 0;">-</h2>
+                    <div id="detalhes-turma-subtitulo" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;"></div>
                 </div>
-                <div id="detalhes-turma-acoes" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                    <!-- Botões de ação injetados via JS -->
-                </div>
+                <div id="detalhes-turma-acoes" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
             </div>
         </div>
 
-        <!-- Painel de Alunos Matriculados -->
-        <div class="card" id="painel-alunos-turma" style="border-left: 4px solid var(--secondary);">
-            <h3 id="titulo-gerenciamento-alunos">👥 Alunos Vinculados</h3>
+        <div class="card">
+            <h3 id="titulo-gerenciamento-alunos" style="font-size: 1.05rem; margin-top: 0; border: none; padding: 0; margin-bottom: 15px;">Alunos Vinculados</h3>
             
-            <div class="operacional-only" style="background-color: var(--bg-body); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 25px;">
-                <label style="color: var(--secondary); font-weight: bold; margin-bottom: 8px;">Matricular Aluno Diretamente Nesta Turma</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="input-vinculo-aluno" list="lista-todos-alunos" placeholder="Busque o aluno por Nome ou CPF..." style="flex: 2;" oninput="aplicarMascaraBuscaTurma(this)">
+            <div class="operacional-only" style="background: var(--bg-surface-elevated); border: 1px solid var(--border); padding: 14px; border-radius: 8px; margin-bottom: 18px;">
+                <label style="color: var(--secondary); margin-bottom: 6px; display: block;">Matricular Aluno Diretamente Nesta Turma</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <input type="text" id="input-vinculo-aluno" list="lista-todos-alunos" placeholder="Buscar por Nome ou CPF..." style="flex: 2; min-width: 260px;" oninput="aplicarMascaraBuscaTurma(this)">
                     <datalist id="lista-todos-alunos"></datalist>
                     <button type="button" class="btn btn-secondary" onclick="vincularAlunoTurma()">Vincular Aluno</button>
                 </div>
             </div>
 
-            <table class="styled-table">
-                <thead>
-                    <tr>
-                        <th>Nome do Aluno</th>
-                        <th>CPF</th>
-                        <th style="text-align: center; width: 160px;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-alunos-matriculados"></tbody>
-            </table>
+            <div class="table-container">
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th>Nome do Aluno</th>
+                            <th style="width: 170px;">CPF</th>
+                            <th style="text-align: center; width: 170px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-alunos-matriculados"></tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- Painel de Lista de Espera -->
-        <div class="card" id="painel-lista-espera" style="border-left: 4px solid var(--warning);">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px;">
-                <h3 id="titulo-lista-espera" style="margin: 0; border: none; padding: 0;">📋 Lista de Espera do Curso</h3>
-                <button class="btn btn-secondary btn-sm" id="btn-imprimir-espera" style="background: #475569;" onclick="">🖨️ Imprimir Lista</button>
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 14px;">
+                <h3 id="titulo-lista-espera" style="margin: 0; font-size: 1.05rem; border: none; padding: 0;">Lista de Espera</h3>
+                <button class="btn btn-outline btn-sm" id="btn-imprimir-espera" onclick="">Imprimir Lista</button>
             </div>
             
+            <div class="table-container">
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th>Nome do Aluno</th>
+                            <th style="width: 160px;">CPF</th>
+                            <th style="width: 300px;">Turma de Destino</th>
+                            <th style="text-align: center; width: 150px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-lista-espera"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAIS -->
+<div id="modal-novo-curso" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Cadastrar Novo Curso</h3>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-novo-curso')">✕</button>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Nome Oficial do Curso</label>
+                <input type="text" id="novo-curso-nome" placeholder="Ex: INFORMÁTICA BÁSICA">
+            </div>
+            <div class="form-group">
+                <label>Carga Horária (Horas)</label>
+                <input type="number" id="novo-curso-carga" placeholder="Ex: 52">
+            </div>
+            <div class="form-group full-width">
+                <label>Conteúdo Programático (Ementa para Certificado)</label>
+                <textarea id="novo-curso-conteudo" rows="4" placeholder="1. Introdução...&#10;2. Conteúdo prático..."></textarea>
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button class="btn btn-secondary" onclick="salvarCurso()">Gravar Curso</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-editar-curso" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="color: var(--warning);">Modificar Parâmetros do Curso</h3>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-editar-curso')">✕</button>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Nome Oficial do Curso</label>
+                <input type="text" id="edit-curso-nome">
+            </div>
+            <div class="form-group">
+                <label>Carga Horária (Horas)</label>
+                <input type="number" id="edit-curso-carga">
+            </div>
+            <div class="form-group full-width">
+                <label>Conteúdo Programático (Ementa para Certificado)</label>
+                <textarea id="edit-curso-conteudo" rows="4"></textarea>
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button class="btn btn-warning" onclick="atualizarCurso()">Atualizar Curso</button>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-editar-curso')">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-nova-turma" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Abrir Nova Turma</h3>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-nova-turma')">✕</button>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Vincular ao Curso</label>
+                <select id="nova-turma-curso"><option value="">Aguarde...</option></select>
+            </div>
+            <div class="form-group">
+                <label>Identificação da Turma</label>
+                <input type="text" id="nova-turma-nome" placeholder="Ex: Turma 01">
+            </div>
+            <div class="form-group">
+                <label>Dia da Semana</label>
+                <select id="nova-turma-dia">
+                    <option value="Segunda">Segunda-feira</option><option value="Terça">Terça-feira</option>
+                    <option value="Quarta">Quarta-feira</option><option value="Quinta">Quinta-feira</option>
+                    <option value="Sexta">Sexta-feira</option><option value="Sábado">Sábado</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Turno</label>
+                <select id="nova-turma-turno">
+                    <option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Instrutor Responsável</label>
+                <select id="nova-turma-instrutor"><option value="">Aguarde...</option></select>
+            </div>
+            <div class="form-group">
+                <label>Limite de Vagas</label>
+                <input type="number" id="nova-turma-vagas" value="20" min="1">
+            </div>
+            <div class="form-group">
+                <label>Data de Início</label>
+                <input type="date" id="nova-turma-inicio">
+            </div>
+            <div class="form-group">
+                <label>Data de Término</label>
+                <input type="date" id="nova-turma-fim">
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button class="btn btn-primary" onclick="salvarTurma()">Gravar Turma</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-editar-turma" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="color: var(--warning);">Modificar Parâmetros da Turma</h3>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-editar-turma')">✕</button>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Curso Vinculado</label>
+                <input type="text" id="edit-turma-curso" readonly>
+            </div>
+            <div class="form-group">
+                <label>Identificação da Turma</label>
+                <input type="text" id="edit-turma-nome">
+            </div>
+            <div class="form-group">
+                <label>Dia da Semana</label>
+                <select id="edit-turma-dia">
+                    <option value="Segunda">Segunda-feira</option><option value="Terça">Terça-feira</option>
+                    <option value="Quarta">Quarta-feira</option><option value="Quinta">Quinta-feira</option>
+                    <option value="Sexta">Sexta-feira</option><option value="Sábado">Sábado</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Turno</label>
+                <select id="edit-turma-turno">
+                    <option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Instrutor Responsável</label>
+                <select id="edit-turma-instrutor"><option value="">Aguarde...</option></select>
+            </div>
+            <div class="form-group">
+                <label>Limite de Vagas</label>
+                <input type="number" id="edit-turma-vagas" min="1">
+            </div>
+            <div class="form-group">
+                <label>Data de Início</label>
+                <input type="date" id="edit-turma-inicio">
+            </div>
+            <div class="form-group">
+                <label>Data de Término</label>
+                <input type="date" id="edit-turma-fim">
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+            <button class="btn btn-warning" onclick="atualizarTurma()">Atualizar Turma</button>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-editar-turma')">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-turmas-inativas" class="modal-overlay">
+    <div class="modal-card" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3 style="color: var(--warning);">🔄 Gestão de Turmas Inativas</h3>
+            <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-turmas-inativas')">✕</button>
+        </div>
+        <div class="table-container">
             <table class="styled-table">
-                <thead>
-                    <tr>
-                        <th>Nome do Aluno</th>
-                        <th>CPF</th>
-                        <th style="width: 30%;">Turma de Destino</th>
-                        <th style="text-align: center; width: 160px;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-lista-espera"></tbody>
+                <thead><tr><th>Curso</th><th>Identificação da Turma</th><th style="text-align: center; width: 120px;">Ações</th></tr></thead>
+                <tbody id="tbody-turmas-inativas"></tbody>
             </table>
         </div>
     </div>
-
 </div>
 
 <script>
@@ -369,31 +608,36 @@
     let idTurmaEdicao = null;
     let idCursoEdicao = null;
 
+    // --- Gestão de Tema Visual ---
+    function aplicarTemaSalvo() {
+        const temaSalvo = localStorage.getItem('sge_tema_ccp') || 'light';
+        document.documentElement.setAttribute('data-theme', temaSalvo);
+        const btn = document.getElementById('btn-alternador-tema');
+        if (btn) btn.innerText = temaSalvo === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Escuro';
+    }
+
+    function alternarTemaVisual() {
+        const temaAtual = document.documentElement.getAttribute('data-theme') || 'light';
+        const novoTema = temaAtual === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', novoTema);
+        localStorage.setItem('sge_tema_ccp', novoTema);
+        const btn = document.getElementById('btn-alternador-tema');
+        if (btn) btn.innerText = novoTema === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Escuro';
+    }
+
+    // --- AUTENTICAÇÃO ORIGINAL MANTIDA RIGOROSAMENTE INTACTA ---
     document.addEventListener("DOMContentLoaded", async () => {
+        aplicarTemaSalvo();
         try {
             const { data: { session }, error } = await supa.auth.getSession();
             if (session && !error) {
                 utilizadorAtual = session.user;
                 iniciarSistema();
+            } else {
+                document.getElementById('login-screen').style.display = 'flex';
             }
         } catch (err) { console.error("Erro na verificação da sessão."); }
     });
-
-    function verificarPermissaoAdmin() {
-        if (nivelAcessoUsuario !== 'Admin') {
-            alert("Acesso negado: Ação restrita ao perfil de administrador.");
-            return false;
-        }
-        return true;
-    }
-
-    function verificarPermissaoEscrita() {
-        if (nivelAcessoUsuario !== 'Admin' && nivelAcessoUsuario !== 'Operacional') {
-            alert("Acesso negado: Perfil sem permissões para realizar modificações.");
-            return false;
-        }
-        return true;
-    }
 
     async function realizarLogin() {
         const email = document.getElementById('login-email').value.trim();
@@ -447,26 +691,22 @@
 
     async function encerrarSessao() { await supa.auth.signOut(); window.location.reload(); }
 
-    function fecharTodosFormulariosAdmin() {
-        document.getElementById('form-curso').style.display = 'none';
-        document.getElementById('form-turma').style.display = 'none';
-        document.getElementById('form-editar-curso').style.display = 'none';
-        document.getElementById('form-editar-turma').style.display = 'none';
-        document.getElementById('painel-turmas-inativas').style.display = 'none';
-    }
-
-    function toggleForm(formId) {
-        if (!verificarPermissaoAdmin()) return;
-        const isCurrentlyVisible = document.getElementById(formId).style.display === 'block';
-        fecharTodosFormulariosAdmin();
-        if (!isCurrentlyVisible) {
-            document.getElementById(formId).style.display = 'block';
-            if(formId === 'form-turma') atualizarSelectCursos();
+    // --- UTILIDADES ---
+    function verificarPermissaoAdmin() {
+        if (nivelAcessoUsuario !== 'Admin') {
+            alert("Acesso negado: Ação restrita ao perfil de administrador.");
+            return false;
         }
+        return true;
     }
 
-    function fecharEdicaoCurso() { document.getElementById('form-editar-curso').style.display = 'none'; idCursoEdicao = null; }
-    function fecharEdicaoTurma() { document.getElementById('form-editar-turma').style.display = 'none'; idTurmaEdicao = null; }
+    function verificarPermissaoEscrita() {
+        if (nivelAcessoUsuario !== 'Admin' && nivelAcessoUsuario !== 'Operacional') {
+            alert("Acesso negado: Perfil sem permissões para realizar modificações.");
+            return false;
+        }
+        return true;
+    }
 
     function aplicarMascaraBuscaTurma(input) {
         let v = input.value;
@@ -490,7 +730,23 @@
         }
     }
 
-    // --- FUNÇÕES DE CURSO ---
+    // --- MODAIS CONTROL ---
+    function abrirModal(modalId) {
+        if (!verificarPermissaoAdmin() && modalId !== 'modal-turmas-inativas') return;
+        if (modalId === 'modal-nova-turma') {
+            atualizarSelectCursos();
+            atualizarSelectInstrutores();
+        }
+        document.getElementById(modalId).style.display = 'flex';
+    }
+
+    function fecharModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+        if (modalId === 'modal-editar-curso') idCursoEdicao = null;
+        if (modalId === 'modal-editar-turma') idTurmaEdicao = null;
+    }
+
+    // --- CURSOS CRUD ---
     async function salvarCurso() {
         if (!verificarPermissaoAdmin()) return;
         const nome = document.getElementById('novo-curso-nome').value.trim().toUpperCase();
@@ -503,8 +759,11 @@
         const { error } = await supa.from('cursos').insert(payload);
         if(error) { alert("Erro ao registar curso: " + error.message); return; }
 
-        document.getElementById('novo-curso-nome').value = ''; document.getElementById('novo-curso-carga').value = ''; document.getElementById('novo-curso-conteudo').value = '';
-        fecharTodosFormulariosAdmin(); carregarDashboard();
+        document.getElementById('novo-curso-nome').value = ''; 
+        document.getElementById('novo-curso-carga').value = ''; 
+        document.getElementById('novo-curso-conteudo').value = '';
+        fecharModal('modal-novo-curso'); 
+        carregarDashboard();
     }
 
     function prepararEdicaoCurso(id) {
@@ -516,10 +775,7 @@
         document.getElementById('edit-curso-nome').value = curso.nome;
         document.getElementById('edit-curso-carga').value = curso.carga_horaria || '';
         document.getElementById('edit-curso-conteudo').value = curso.conteudo_programatico || '';
-        
-        fecharTodosFormulariosAdmin();
-        document.getElementById('form-editar-curso').style.display = 'block';
-        window.scrollTo({ top: document.getElementById('form-editar-curso').offsetTop, behavior: 'smooth' });
+        abrirModal('modal-editar-curso');
     }
 
     async function atualizarCurso() {
@@ -535,7 +791,8 @@
         if(error) { alert("Erro ao atualizar curso: " + error.message); return; }
 
         alert("Parâmetros do curso atualizados com sucesso!");
-        fecharEdicaoCurso(); await carregarDashboard();
+        fecharModal('modal-editar-curso'); 
+        await carregarDashboard();
     }
 
     async function desativarCurso(id) {
@@ -545,7 +802,7 @@
         carregarDashboard();
     }
 
-    // --- FUNÇÕES DE TURMA ---
+    // --- TURMAS CRUD ---
     async function salvarTurma() {
         if (!verificarPermissaoAdmin()) return;
         const curso = document.getElementById('nova-turma-curso').value;
@@ -565,12 +822,14 @@
         const { error } = await supa.from('turmas').insert(payload);
         if(error) { alert("Erro ao registar turma: " + error.message); return; }
 
-        fecharTodosFormulariosAdmin(); carregarDashboard();
+        fecharModal('modal-nova-turma'); 
+        carregarDashboard();
     }
 
     function prepararEdicaoTurma(id, curso, identificador, dia, turno, instrutor, vagas, dataInicio, dataFim) {
         if (!verificarPermissaoAdmin()) return;
         idTurmaEdicao = id;
+        atualizarSelectInstrutores();
         document.getElementById('edit-turma-curso').value = curso;
         document.getElementById('edit-turma-nome').value = identificador.split(' (')[0];
         document.getElementById('edit-turma-dia').value = dia;
@@ -579,10 +838,7 @@
         document.getElementById('edit-turma-vagas').value = vagas;
         document.getElementById('edit-turma-inicio').value = dataInicio && dataInicio !== 'null' && dataInicio !== 'undefined' ? dataInicio : '';
         document.getElementById('edit-turma-fim').value = dataFim && dataFim !== 'null' && dataFim !== 'undefined' ? dataFim : '';
-        
-        fecharTodosFormulariosAdmin();
-        document.getElementById('form-editar-turma').style.display = 'block';
-        window.scrollTo({ top: document.getElementById('form-editar-turma').offsetTop, behavior: 'smooth' });
+        abrirModal('modal-editar-turma');
     }
 
     async function atualizarTurma() {
@@ -603,7 +859,8 @@
         if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
 
         alert("Turma atualizada com sucesso!");
-        fecharEdicaoTurma(); await carregarDashboard();
+        fecharModal('modal-editar-turma'); 
+        await carregarDashboard();
     }
 
     async function alterarStatusTurmaDetalhe(id, novoStatus) {
@@ -615,8 +872,7 @@
 
     async function abrirTurmasInativas() {
         if (!verificarPermissaoAdmin()) return;
-        fecharTodosFormulariosAdmin();
-        document.getElementById('painel-turmas-inativas').style.display = 'block';
+        abrirModal('modal-turmas-inativas');
         const tbody = document.getElementById('tbody-turmas-inativas');
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">A pesquisar turmas inativas...</td></tr>';
         
@@ -634,8 +890,10 @@
 
     async function reativarTurma(id) {
         if (!verificarPermissaoAdmin()) return;
-        await supa.from('turmas').update({ status: 'Ativo' }).eq('id', id);
-        abrirTurmasInativas(); carregarDashboard();
+        const { error } = await supa.from('turmas').update({ status: 'Ativo' }).eq('id', id);
+        if (error) { alert("Erro ao reativar: " + error.message); return; }
+        fecharModal('modal-turmas-inativas');
+        await carregarDashboard();
     }
 
     async function alternarMatriculasTurmaDetalhe(id, bloqueadaAtual) {
@@ -650,9 +908,8 @@
         await carregarDashboard();
     }
 
-    // --- CARREGAMENTO DADOS BASE ---
+    // --- CARREGAMENTO DADOS BASE & DASHBOARD ---
     async function fetchDados() {
-        // Alterado para incluir telefone e email essenciais para a impressão da lista de espera
         const [resCursos, resTurmas, resAlunos, resInstrutores] = await Promise.all([
             supa.from('cursos').select('*').eq('status', 'Ativo').order('nome'),
             supa.from('turmas').select('*').neq('status', 'Inativo').order('curso_nome'),
@@ -674,42 +931,81 @@
         return true;
     }
 
+    function atualizarMetricasKpi() {
+        let totalCursando = 0;
+        let totalEspera = 0;
+
+        // Conjunto contendo o identificador exato de todas as turmas ativas no módulo
+        const turmasAtivasSet = new Set(
+            turmasMemoria.map(t => `${t.curso_nome} [${t.identificador}]`)
+        );
+
+        alunosMemoria.forEach(a => {
+            if (a.cursos) {
+                const arr = a.cursos.split(' | ').map(c => c.trim());
+                arr.forEach(c => {
+                    if (c.includes('[Pendente/Lista de Espera]')) {
+                        totalEspera++;
+                    } else if (!c.includes('(INATIVO)')) {
+                        if (turmasAtivasSet.has(c)) {
+                            totalCursando++;
+                        }
+                    }
+                });
+            }
+        });
+
+        document.getElementById('kpi-total-cursos').innerText = cursosMemoria.length;
+        document.getElementById('kpi-total-turmas').innerText = turmasMemoria.length;
+        document.getElementById('kpi-total-matriculados').innerText = totalCursando;
+        document.getElementById('kpi-total-espera').innerText = totalEspera;
+    }
+
     async function carregarDashboard() {
         const container = document.getElementById('dashboard-container');
-        if(!idTurmaAberta) container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">A processar métricas...</p>';
+        if(!idTurmaAberta) container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px 0;">A processar métricas...</p>';
 
         const sucesso = await fetchDados();
         if(!sucesso) return;
 
-        // Renderiza Dashboard Simplificado
+        atualizarMetricasKpi();
+        renderizarCardsDashboard(cursosMemoria, turmasMemoria);
+
+        if(idTurmaAberta) abrirDetalhesTurma(idTurmaAberta, true);
+    }
+
+    function renderizarCardsDashboard(cursos, turmas) {
+        const container = document.getElementById('dashboard-container');
         let htmlFinal = '';
-        if(cursosMemoria.length === 0) {
-            htmlFinal = '<p style="text-align: center; color: var(--text-muted);">Nenhum curso ativo localizado.</p>';
+
+        if(cursos.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px 0;">Nenhum curso localizado.</p>';
+            return;
         }
 
-        cursosMemoria.forEach(curso => {
-            const turmasDoCurso = turmasMemoria.filter(t => t.curso_nome === curso.nome);
+        cursos.forEach(curso => {
+            const turmasDoCurso = turmas.filter(t => t.curso_nome === curso.nome);
             const strEspera = `${curso.nome} [Pendente/Lista de Espera]`;
             const qtdEspera = alunosMemoria.filter(a => a.cursos && a.cursos.includes(strEspera)).length;
 
             htmlFinal += `
             <div class="curso-simplified-block">
                 <div class="curso-simplified-header">
-                    <span style="display: flex; align-items: center; gap: 10px;">
-                        📚 ${curso.nome} 
-                        <span style="font-size: 10pt; color: var(--text-muted); font-weight: normal; background: var(--bg-card); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: 800; color: var(--text-main); font-size: 1.1rem;">📚 ${curso.nome}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-input); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
                             ⏳ ${curso.carga_horaria ? curso.carga_horaria + 'h' : 'N/I'}
                         </span>
-                    </span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        ${qtdEspera > 0 ? `<span class="badge badge-espera" style="margin-right:10px;">${qtdEspera} na Lista de Espera</span>` : ''}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${qtdEspera > 0 ? `<span class="badge badge-espera">${qtdEspera} na Lista de Espera</span>` : ''}
                         <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${curso.id}')">✏️ Editar Curso</button>
                         <button class="btn btn-danger btn-sm admin-only" onclick="desativarCurso('${curso.id}')">🗑️ Desativar</button>
                     </div>
                 </div>`;
 
             if(turmasDoCurso.length === 0) {
-                htmlFinal += `<p style="font-size: 10pt; color: var(--text-muted); margin: 0;">Sem turmas ativas vinculadas.</p>`;
+                htmlFinal += `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Sem turmas ativas vinculadas.</p>`;
             } else {
                 htmlFinal += `<div class="turma-grid">`;
                 turmasDoCurso.forEach(turma => {
@@ -725,27 +1021,36 @@
 
                     const isBloqueada = turma.matriculas_bloqueadas === true;
                     
-                    // Lógica de Cores da Lotação (Abaixo = Verde, Ideal = Azul, Acima = Vermelho)
-                    let classeVagas = '';
+                    let classeBadge = 'badge-disponivel';
+                    let barColor = 'var(--secondary)';
                     if (contagemMatriculados > turma.vagas_limite) {
-                        classeVagas = 'excedida';
+                        classeBadge = 'badge-excedida';
+                        barColor = 'var(--danger)';
                     } else if (contagemMatriculados === turma.vagas_limite) {
-                        classeVagas = 'ideal';
-                    } else {
-                        classeVagas = 'disponivel';
+                        classeBadge = 'badge-ideal';
+                        barColor = 'var(--primary)';
                     }
-                    
-                    const badgeTrava = isBloqueada ? `<span class="badge badge-status badge-bloqueada">Fechada</span>` : '';
+
+                    const pctOcupacao = Math.min(Math.round((contagemMatriculados / (turma.vagas_limite || 1)) * 100), 100);
+                    const badgeTrava = isBloqueada ? `<span class="badge badge-bloqueada">Fechada</span>` : '';
 
                     htmlFinal += `
                     <div class="turma-card ${isBloqueada ? 'bloqueada' : ''}" onclick="abrirDetalhesTurma('${turma.id}')">
-                        <div class="turma-card-header">
-                            <span class="turma-card-title">${turma.identificador}</span>
-                            ${badgeTrava}
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${turma.identificador}</span>
+                                ${badgeTrava}
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">${turma.dia_semana} • ${turma.turno}</div>
                         </div>
-                        <div class="turma-card-subtitle">${turma.dia_semana} - ${turma.turno}</div>
-                        <div class="turma-card-stats">
-                            <span class="badge badge-vagas ${classeVagas}">${contagemMatriculados}/${turma.vagas_limite} Alunos</span>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">${contagemMatriculados} / ${turma.vagas_limite} Alunos</span>
+                                <span class="badge ${classeBadge}">${pctOcupacao}%</span>
+                            </div>
+                            <div class="capacity-bar">
+                                <div class="capacity-fill" style="width: ${pctOcupacao}%; background-color: ${barColor};"></div>
+                            </div>
                         </div>
                     </div>`;
                 });
@@ -755,19 +1060,31 @@
         });
 
         container.innerHTML = htmlFinal;
-
-        // Se uma turma estiver aberta em detalhes, recarregamos as views dela
-        if(idTurmaAberta) {
-            abrirDetalhesTurma(idTurmaAberta, true);
-        }
     }
 
-    // --- VISÃO DETALHADA DA TURMA (UNIFICADA) ---
+    function filtrarDashboardInstantaneo(termo) {
+        if (idTurmaAberta) voltarDashboard();
+        const query = termo.toLowerCase().trim();
+        if (!query) {
+            renderizarCardsDashboard(cursosMemoria, turmasMemoria);
+            return;
+        }
+
+        const cursosFiltrados = cursosMemoria.filter(c => {
+            const matchCurso = c.nome.toLowerCase().includes(query);
+            const matchTurma = turmasMemoria.some(t => t.curso_nome === c.nome && t.identificador.toLowerCase().includes(query));
+            return matchCurso || matchTurma;
+        });
+
+        renderizarCardsDashboard(cursosFiltrados, turmasMemoria);
+    }
+
+    // --- VISÃO DETALHADA DA TURMA ---
     function voltarDashboard() {
         idTurmaAberta = null;
         document.getElementById('view-detalhes-turma').style.display = 'none';
         document.getElementById('view-dashboard').style.display = 'block';
-        carregarDashboard(); // Refresh final para garantir alinhamento dos cards caso haja mutação
+        carregarDashboard();
     }
 
     function abrirDetalhesTurma(idTurma, isRefresh = false) {
@@ -787,16 +1104,14 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Atualizar Cabeçalho 
-        document.getElementById('detalhes-turma-titulo').innerHTML = `${curso.nome} <span style="color:var(--text-main);">[${turma.identificador}]</span>`;
-        document.getElementById('detalhes-turma-subtitulo').innerHTML = `Instrutor: <strong>${turma.instrutor}</strong> | ${turma.dia_semana} - ${turma.turno}`;
+        document.getElementById('detalhes-turma-titulo').innerHTML = `${curso.nome} <span style="color:var(--text-muted); font-weight:400;">[${turma.identificador}]</span>`;
+        document.getElementById('detalhes-turma-subtitulo').innerHTML = `Instrutor: <strong style="color:var(--text-main);">${turma.instrutor}</strong> &nbsp;|&nbsp; ${turma.dia_semana} - ${turma.turno}`;
 
-        // Atualizar Botões de Ação
         const isBloqueada = turma.matriculas_bloqueadas === true;
         const containerAcoes = document.getElementById('detalhes-turma-acoes');
         containerAcoes.innerHTML = `
-            <button class="btn ${!isBloqueada ? 'btn-warning' : 'btn-secondary'} btn-sm admin-only" onclick="alternarMatriculasTurmaDetalhe('${turma.id}', ${isBloqueada})">${!isBloqueada ? '🔒 Bloquear Matrículas' : '🔓 Liberar Matrículas'}</button>
-            <button class="btn btn-secondary btn-sm" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir Diário</button>
+            <button class="btn ${!isBloqueada ? 'btn-outline' : 'btn-secondary'} btn-sm admin-only" onclick="alternarMatriculasTurmaDetalhe('${turma.id}', ${isBloqueada})">${!isBloqueada ? '🔒 Bloquear Matrículas' : '🔓 Liberar Matrículas'}</button>
+            <button class="btn btn-outline btn-sm" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir Diário</button>
             <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar Turma</button>
             <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurmaDetalhe('${turma.id}', 'Inativo')">🗑️ Desativar Turma</button>
         `;
@@ -805,7 +1120,6 @@
         gerenciarListaEsperaMemoria(curso.nome);
     }
 
-    // --- ALUNOS VINCULADOS (Lê da Memória) ---
     function gerenciarAlunosTurmaMemoria(cursoNome, identificadorTurma) {
         document.getElementById('titulo-gerenciamento-alunos').innerText = `👥 Alunos Vinculados`;
         const tbody = document.getElementById('tbody-alunos-matriculados');
@@ -815,7 +1129,7 @@
         
         tbody.innerHTML = '';
         if(alunosDaTurma.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nenhum aluno vinculado a esta turma.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding: 24px 0;">Nenhum aluno vinculado a esta turma.</td></tr>';
             return;
         }
 
@@ -824,25 +1138,23 @@
         alunosDaTurma.forEach(aluno => {
             const cursosArray = aluno.cursos ? aluno.cursos.split(' | ').map(c => c.trim()) : [];
             const isInativo = cursosArray.includes(`${stringBusca} (INATIVO)`);
-            const badgeInativo = isInativo ? ` <span style="color:var(--danger); font-size:9pt; font-weight:bold;">(Desistente)</span>` : '';
+            const badgeInativo = isInativo ? ` <span class="badge badge-excedida" style="margin-left:6px;">(Desistente)</span>` : '';
 
             const acaoHtml = temPermissaoMutacao 
-                ? `<button class="btn btn-warning btn-sm" style="padding:2px 8px; font-size:9pt; margin-right:4px;" onclick="alternarStatusAlunoTurma('${aluno.cpf}', ${isInativo})">${isInativo ? 'Ativar' : 'Inativar'}</button>
-                   <button class="btn btn-danger btn-sm" style="padding:2px 8px; font-size:9pt;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>`
-                : `<span style="color:var(--text-muted); font-size:9pt;">Apenas Leitura</span>`;
+                ? `<button class="btn btn-outline btn-sm" style="padding: 3px 8px; margin-right: 4px;" onclick="alternarStatusAlunoTurma('${aluno.cpf}', ${isInativo})">${isInativo ? 'Ativar' : 'Inativar'}</button>
+                   <button class="btn btn-danger btn-sm" style="padding: 3px 8px;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>`
+                : `<span style="color:var(--text-muted); font-size:0.8rem;">Apenas Leitura</span>`;
 
             tbody.innerHTML += `<tr>
                 <td><strong>${aluno.nome}</strong>${badgeInativo}</td>
-                <td>${aluno.cpf}</td>
+                <td style="color: var(--text-muted);">${aluno.cpf}</td>
                 <td style="text-align:center; white-space:nowrap;">${acaoHtml}</td>
             </tr>`;
         });
     }
 
-    // --- LISTA DE ESPERA (Lê da Memória) ---
     function gerenciarListaEsperaMemoria(cursoNome) {
         document.getElementById('titulo-lista-espera').innerText = `📋 Lista de Espera: ${cursoNome}`;
-        // Atribui a função de impressão com o nome do curso correto ao botão
         document.getElementById('btn-imprimir-espera').setAttribute('onclick', `imprimirListaEspera('${cursoNome}')`);
 
         const tbody = document.getElementById('tbody-lista-espera');
@@ -850,7 +1162,7 @@
         const alunosNaEspera = alunosMemoria.filter(a => a.cursos && a.cursos.includes(stringEspera));
         
         if (alunosNaEspera.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">A lista de espera para este curso está vazia.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding: 24px 0;">A lista de espera para este curso está vazia.</td></tr>';
             return;
         }
 
@@ -876,9 +1188,9 @@
         alunosNaEspera.forEach(aluno => {
             tbody.innerHTML += `<tr>
                 <td><strong>${aluno.nome}</strong></td>
-                <td>${aluno.cpf}</td>
+                <td style="color: var(--text-muted);">${aluno.cpf}</td>
                 <td>
-                    <select class="operacional-only" id="turma-destino-${aluno.cpf}" style="width: 100%; padding: 6px;">${opcoesTurma}</select>
+                    <select class="operacional-only" id="turma-destino-${aluno.cpf}" style="padding: 6px 10px; border-radius: 6px;">${opcoesTurma}</select>
                 </td>
                 <td style="text-align:center;">
                     <button class="btn btn-secondary btn-sm operacional-only" onclick="promoverAlunoEspera('${aluno.cpf}', '${cursoNome}')">Tornar Titular</button>
@@ -1119,14 +1431,11 @@
                         <th style="width: 20%;">Observações</th>
                     </tr>
                 </thead>
-                <tbody>
-                    ${tbodyHtml}
-                </tbody>
+                <tbody>${tbodyHtml}</tbody>
             </table>
             <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
         </body>
-        </html>
-        `;
+        </html>`;
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     }
@@ -1228,8 +1537,7 @@
             </table>
             <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
         </body>
-        </html>
-        `;
+        </html>`;
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     }
