@@ -224,6 +224,8 @@
         .btn-sm { padding: 6px 12px; font-size: 0.78rem; }
 
         .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; border: 1px solid transparent; }
+        .badge-clickable { cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; }
+        .badge-clickable:hover { transform: translateY(-1px); filter: brightness(1.15); }
         .badge-disponivel { background: rgba(16, 185, 129, 0.15); color: var(--secondary); border-color: rgba(16, 185, 129, 0.3); }
         .badge-ideal { background: rgba(2, 132, 199, 0.15); color: var(--primary); border-color: rgba(2, 132, 199, 0.3); }
         .badge-excedida { background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: rgba(239, 68, 68, 0.3); }
@@ -411,6 +413,27 @@
                 </table>
             </div>
         </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 14px;">
+                <h3 id="titulo-lista-desistentes" style="margin: 0; font-size: 1.05rem; border: none; padding: 0; color: var(--danger);">🚫 Alunos Desistentes</h3>
+                <button class="btn btn-outline btn-sm" id="btn-imprimir-desistentes" onclick="">Imprimir Lista</button>
+            </div>
+            
+            <div class="table-container">
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th>Nome do Aluno</th>
+                            <th style="width: 160px;">CPF</th>
+                            <th style="width: 160px;">Telefone</th>
+                            <th style="width: 300px;">Turma de Origem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-lista-desistentes"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -588,6 +611,24 @@
     </div>
 </div>
 
+<div id="modal-listagem-rapida" class="modal-overlay">
+    <div class="modal-card" style="max-width: 820px;">
+        <div class="modal-header">
+            <h3 id="modal-listagem-titulo">Lista de Alunos</h3>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-outline btn-sm" id="btn-modal-imprimir">🖨️ Imprimir Lista</button>
+                <button class="btn btn-outline btn-sm" onclick="fecharModal('modal-listagem-rapida')">✕</button>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="styled-table">
+                <thead id="thead-modal-listagem"></thead>
+                <tbody id="tbody-modal-listagem"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <script>
     const supabaseUrl = 'https://qdmityjaqwvcesejsexh.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbWl0eWphcXd2Y2VzZWpzZXhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2ODU4NzAsImV4cCI6MjA5NDI2MTg3MH0.cqmB5B-lTaC1TaQwXuOlWjKjlnTufaGq6ndlm3K1uvI';
@@ -607,6 +648,43 @@
     
     let idTurmaEdicao = null;
     let idCursoEdicao = null;
+
+    // --- Utilitários de Segurança e Tratamento de Dados ---
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escapeJsParam(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '');
+    }
+
+    function parseDataCadastro(dataStr) {
+        if (!dataStr) return new Date(0);
+        dataStr = String(dataStr).trim();
+        if (dataStr.includes('/')) {
+            const partes = dataStr.split(' ')[0].split('/');
+            if (partes.length === 3) {
+                const [dia, mes, ano] = partes;
+                const d = new Date(`${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}T00:00:00`);
+                if (!isNaN(d.getTime())) return d;
+            }
+        }
+        const dIso = new Date(dataStr);
+        if (!isNaN(dIso.getTime())) return dIso;
+        return new Date(0);
+    }
 
     // --- Gestão de Tema Visual ---
     function aplicarTemaSalvo() {
@@ -652,16 +730,29 @@
     }
 
     async function iniciarSistema() {
-        const { data: perfilData, error: perfilError } = await supa
+        let { data: perfilData, error: perfilError } = await supa
             .from('perfis') 
             .select('nivel_acesso')
             .eq('id', utilizadorAtual.id)
-            .single();
+            .maybeSingle();
 
-        if (perfilData) {
+        // Fallback por e-mail caso o ID do Auth não seja idêntico ao da tabela perfis
+        if (!perfilData && utilizadorAtual.email) {
+            const { data: perfilPorEmail, error: errEmail } = await supa
+                .from('perfis')
+                .select('nivel_acesso')
+                .eq('email', utilizadorAtual.email)
+                .maybeSingle();
+            if (perfilPorEmail) perfilData = perfilPorEmail;
+            if (errEmail) console.error("Erro busca por e-mail:", errEmail);
+        }
+
+        if (perfilData && perfilData.nivel_acesso) {
             nivelAcessoUsuario = perfilData.nivel_acesso;
         } else {
-            alert("Perfil de acesso não configurado.");
+            console.error("Erro ao carregar perfil:", perfilError);
+            const detalhe = perfilError ? ` (${perfilError.message})` : "";
+            alert("Perfil de acesso não configurado." + detalhe);
             await supa.auth.signOut();
             return;
         }
@@ -710,13 +801,17 @@
 
     function aplicarMascaraBuscaTurma(input) {
         let v = input.value;
-        if (/\d/.test(v)) { 
-            v = v.replace(/\D/g, "");
-            if (v.length > 11) v = v.substring(0, 11);
-            v = v.replace(/(\d{3})(\d)/, "$1.$2");
-            v = v.replace(/(\d{3})(\d)/, "$1.$2");
-            v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-            input.value = v;
+        // Se contiver letras ou o separador da lista suspensa (" - "), mantém o texto do nome
+        if (v.includes(" - ") || /[a-zA-ZÀ-ÿ]/.test(v)) {
+            return;
+        }
+        let apenasDigitos = v.replace(/\D/g, "");
+        if (apenasDigitos.length > 0) {
+            if (apenasDigitos.length > 11) apenasDigitos = apenasDigitos.substring(0, 11);
+            apenasDigitos = apenasDigitos.replace(/^(\d{3})(\d)/, "$1.$2");
+            apenasDigitos = apenasDigitos.replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3");
+            apenasDigitos = apenasDigitos.replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, "$1.$2.$3-$4");
+            input.value = apenasDigitos;
         }
     }
 
@@ -726,13 +821,47 @@
             todosAlunosNuvem = data;
             const dl = document.getElementById('lista-todos-alunos');
             dl.innerHTML = '';
-            data.forEach(a => { dl.innerHTML += `<option value="${a.nome} - ${a.cpf}"></option>`; });
+            data.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = `${a.nome} - ${a.cpf}`;
+                dl.appendChild(opt);
+            });
         }
+    }
+
+    // --- FUNÇÕES AUXILIARES DE LISTAGEM (ESPERA E DESISTENTES) ---
+    function obterDesistentesDoCurso(cursoNome) {
+        const lista = [];
+        const prefixo = `${cursoNome} [`;
+        alunosMemoria.forEach(a => {
+            if (a.cursos) {
+                const arr = a.cursos.split(' | ').map(c => c.trim());
+                arr.forEach(c => {
+                    if (c.startsWith(prefixo) && c.includes('(INATIVO)')) {
+                        let turmaOrig = '-';
+                        const idxAbre = c.indexOf('[');
+                        const idxFecha = c.indexOf(']');
+                        if (idxAbre !== -1 && idxFecha !== -1) {
+                            turmaOrig = c.substring(idxAbre + 1, idxFecha);
+                        }
+                        lista.push({
+                            nome: a.nome,
+                            cpf: a.cpf,
+                            telefone: a.telefone || '-',
+                            email: a.email || '-',
+                            data_cadastro: a.data_cadastro || '-',
+                            turma_origem: turmaOrig
+                        });
+                    }
+                });
+            }
+        });
+        return lista;
     }
 
     // --- MODAIS CONTROL ---
     function abrirModal(modalId) {
-        if (!verificarPermissaoAdmin() && modalId !== 'modal-turmas-inativas') return;
+        if (!verificarPermissaoAdmin() && modalId !== 'modal-turmas-inativas' && modalId !== 'modal-listagem-rapida') return;
         if (modalId === 'modal-nova-turma') {
             atualizarSelectCursos();
             atualizarSelectInstrutores();
@@ -744,6 +873,73 @@
         document.getElementById(modalId).style.display = 'none';
         if (modalId === 'modal-editar-curso') idCursoEdicao = null;
         if (modalId === 'modal-editar-turma') idTurmaEdicao = null;
+    }
+
+    function abrirModalListaEsperaCurso(cursoNome) {
+        const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
+        const alunosNaEspera = alunosMemoria.filter(a => {
+            if (!a.cursos) return false;
+            const cursosArr = a.cursos.split(' | ').map(c => c.trim());
+            return cursosArr.includes(stringEspera);
+        });
+
+        alunosNaEspera.sort((a, b) => {
+            return parseDataCadastro(a.data_cadastro) - parseDataCadastro(b.data_cadastro);
+        });
+
+        document.getElementById('modal-listagem-titulo').innerHTML = `📋 Lista de Espera: <span style="color:var(--warning);">${escapeHtml(cursoNome)}</span>`;
+        document.getElementById('btn-modal-imprimir').onclick = () => imprimirListaEspera(cursoNome);
+
+        const thead = document.getElementById('thead-modal-listagem');
+        const tbody = document.getElementById('tbody-modal-listagem');
+
+        thead.innerHTML = `<tr><th style="width:45px; text-align:center;">Nº</th><th>Nome do Aluno</th><th>CPF</th><th>Telefone</th><th style="text-align:center;">Data Fila</th></tr>`;
+
+        if (alunosNaEspera.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding: 24px 0;">Nenhum aluno na lista de espera.</td></tr>`;
+        } else {
+            tbody.innerHTML = '';
+            alunosNaEspera.forEach((a, idx) => {
+                tbody.innerHTML += `<tr>
+                    <td style="text-align:center; color:var(--text-muted);">${idx + 1}</td>
+                    <td><strong>${escapeHtml(a.nome)}</strong></td>
+                    <td style="color:var(--text-muted);">${escapeHtml(a.cpf)}</td>
+                    <td>${escapeHtml(a.telefone || '-')}</td>
+                    <td style="text-align:center;">${escapeHtml(a.data_cadastro || '-')}</td>
+                </tr>`;
+            });
+        }
+
+        document.getElementById('modal-listagem-rapida').style.display = 'flex';
+    }
+
+    function abrirModalDesistentesCurso(cursoNome) {
+        const desistentes = obterDesistentesDoCurso(cursoNome);
+
+        document.getElementById('modal-listagem-titulo').innerHTML = `🚫 Alunos Desistentes: <span style="color:var(--danger);">${escapeHtml(cursoNome)}</span>`;
+        document.getElementById('btn-modal-imprimir').onclick = () => imprimirListaDesistentes(cursoNome);
+
+        const thead = document.getElementById('thead-modal-listagem');
+        const tbody = document.getElementById('tbody-modal-listagem');
+
+        thead.innerHTML = `<tr><th style="width:45px; text-align:center;">Nº</th><th>Nome do Aluno</th><th>CPF</th><th>Telefone</th><th>Turma de Origem</th></tr>`;
+
+        if (desistentes.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding: 24px 0;">Nenhum aluno desistente registrado para este curso.</td></tr>`;
+        } else {
+            tbody.innerHTML = '';
+            desistentes.forEach((d, idx) => {
+                tbody.innerHTML += `<tr>
+                    <td style="text-align:center; color:var(--text-muted);">${idx + 1}</td>
+                    <td><strong>${escapeHtml(d.nome)}</strong></td>
+                    <td style="color:var(--text-muted);">${escapeHtml(d.cpf)}</td>
+                    <td>${escapeHtml(d.telefone)}</td>
+                    <td><span class="badge badge-excedida">${escapeHtml(d.turma_origem)}</span></td>
+                </tr>`;
+            });
+        }
+
+        document.getElementById('modal-listagem-rapida').style.display = 'flex';
     }
 
     // --- CURSOS CRUD ---
@@ -785,10 +981,31 @@
         const conteudo = document.getElementById('edit-curso-conteudo').value.trim();
 
         if(!nome) { alert("O nome do curso é obrigatório."); return; }
-        const payload = { nome: nome, carga_horaria: carga, conteudo_programatico: conteudo };
+        
+        const cursoAntigo = cursosMemoria.find(c => c.id == idCursoEdicao);
+        const nomeAntigo = cursoAntigo ? cursoAntigo.nome : null;
 
+        const payload = { nome: nome, carga_horaria: carga, conteudo_programatico: conteudo };
         const { error } = await supa.from('cursos').update(payload).eq('id', idCursoEdicao);
         if(error) { alert("Erro ao atualizar curso: " + error.message); return; }
+
+        // Sincronizar turmas e matrículas caso o nome do curso tenha sido alterado
+        if (nomeAntigo && nomeAntigo !== nome) {
+            try {
+                await supa.from('turmas').update({ curso_nome: nome }).eq('curso_nome', nomeAntigo);
+                const { data: alunosAfetados } = await supa.from('alunos_ccp').select('cpf, cursos').like('cursos', `%${nomeAntigo}%`);
+                if (alunosAfetados && alunosAfetados.length > 0) {
+                    for (const al of alunosAfetados) {
+                        if (al.cursos) {
+                            const novosCursos = al.cursos.replaceAll(nomeAntigo, nome);
+                            await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', al.cpf);
+                        }
+                    }
+                }
+            } catch(syncErr) {
+                console.error("Erro na sincronização de dependências do curso:", syncErr);
+            }
+        }
 
         alert("Parâmetros do curso atualizados com sucesso!");
         fecharModal('modal-editar-curso'); 
@@ -853,10 +1070,38 @@
 
         if(!nomeTurma || !instrutor || !vagas || !dataInicio || !dataFim) { alert("Preencha todos os campos obrigatórios, incluindo as datas."); return; }
 
+        const turmaAntiga = turmasMemoria.find(t => t.id === idTurmaEdicao);
+        const identificadorAntigo = turmaAntiga ? turmaAntiga.identificador : null;
+        const cursoNome = turmaAntiga ? turmaAntiga.curso_nome : document.getElementById('edit-turma-curso').value;
+
         const novoIdentificador = `${nomeTurma} (${turno} - ${dia})`;
         const { error } = await supa.from('turmas').update({ identificador: novoIdentificador, dia_semana: dia, turno: turno, instrutor: instrutor, vagas_limite: vagas, data_inicio: dataInicio, data_fim: dataFim }).eq('id', idTurmaEdicao);
 
         if(error) { alert("Erro ao atualizar parâmetros da turma: " + error.message); return; }
+
+        // Sincronizar identificador da turma nos alunos vinculados caso tenha sido modificado
+        if (identificadorAntigo && identificadorAntigo !== novoIdentificador && cursoNome) {
+            try {
+                const strAntiga = `${cursoNome} [${identificadorAntigo}]`;
+                const strNova = `${cursoNome} [${novoIdentificador}]`;
+                const strAntigaInativo = `${strAntiga} (INATIVO)`;
+                const strNovaInativo = `${strNova} (INATIVO)`;
+
+                const { data: alunosAfetados } = await supa.from('alunos_ccp').select('cpf, cursos').like('cursos', `%${strAntiga}%`);
+                if (alunosAfetados && alunosAfetados.length > 0) {
+                    for (const al of alunosAfetados) {
+                        if (al.cursos) {
+                            const novosCursos = al.cursos
+                                .replaceAll(strAntigaInativo, strNovaInativo)
+                                .replaceAll(strAntiga, strNova);
+                            await supa.from('alunos_ccp').update({ cursos: novosCursos }).eq('cpf', al.cpf);
+                        }
+                    }
+                }
+            } catch(syncErr) {
+                console.error("Erro na sincronização de matrículas da turma:", syncErr);
+            }
+        }
 
         alert("Turma atualizada com sucesso!");
         fecharModal('modal-editar-turma'); 
@@ -987,20 +1232,22 @@
             const turmasDoCurso = turmas.filter(t => t.curso_nome === curso.nome);
             const strEspera = `${curso.nome} [Pendente/Lista de Espera]`;
             const qtdEspera = alunosMemoria.filter(a => a.cursos && a.cursos.includes(strEspera)).length;
+            const qtdDesistentes = obterDesistentesDoCurso(curso.nome).length;
 
             htmlFinal += `
             <div class="curso-simplified-block">
                 <div class="curso-simplified-header">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-weight: 800; color: var(--text-main); font-size: 1.1rem;">📚 ${curso.nome}</span>
+                        <span style="font-weight: 800; color: var(--text-main); font-size: 1.1rem;">📚 ${escapeHtml(curso.nome)}</span>
                         <span style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-input); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
-                            ⏳ ${curso.carga_horaria ? curso.carga_horaria + 'h' : 'N/I'}
+                            ⏳ ${curso.carga_horaria ? escapeHtml(curso.carga_horaria) + 'h' : 'N/I'}
                         </span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        ${qtdEspera > 0 ? `<span class="badge badge-espera">${qtdEspera} na Lista de Espera</span>` : ''}
-                        <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${curso.id}')">✏️ Editar Curso</button>
-                        <button class="btn btn-danger btn-sm admin-only" onclick="desativarCurso('${curso.id}')">🗑️ Desativar</button>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        ${qtdEspera > 0 ? `<span class="badge badge-espera badge-clickable" title="Clique para ver e imprimir a Lista de Espera" onclick="abrirModalListaEsperaCurso('${escapeJsParam(curso.nome)}')">${qtdEspera} na Lista de Espera</span>` : ''}
+                        ${qtdDesistentes > 0 ? `<span class="badge badge-excedida badge-clickable" title="Clique para ver e imprimir a Lista de Desistentes" onclick="abrirModalDesistentesCurso('${escapeJsParam(curso.nome)}')">${qtdDesistentes} Desistente${qtdDesistentes > 1 ? 's' : ''}</span>` : ''}
+                        <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoCurso('${escapeJsParam(curso.id)}')">✏️ Editar Curso</button>
+                        <button class="btn btn-danger btn-sm admin-only" onclick="desativarCurso('${escapeJsParam(curso.id)}')">🗑️ Desativar</button>
                     </div>
                 </div>`;
 
@@ -1035,13 +1282,13 @@
                     const badgeTrava = isBloqueada ? `<span class="badge badge-bloqueada">Fechada</span>` : '';
 
                     htmlFinal += `
-                    <div class="turma-card ${isBloqueada ? 'bloqueada' : ''}" onclick="abrirDetalhesTurma('${turma.id}')">
+                    <div class="turma-card ${isBloqueada ? 'bloqueada' : ''}" onclick="abrirDetalhesTurma('${escapeJsParam(turma.id)}')">
                         <div>
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${turma.identificador}</span>
+                                <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${escapeHtml(turma.identificador)}</span>
                                 ${badgeTrava}
                             </div>
-                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">${turma.dia_semana} • ${turma.turno}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">${escapeHtml(turma.dia_semana)} • ${escapeHtml(turma.turno)}</div>
                         </div>
                         <div>
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -1104,20 +1351,21 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        document.getElementById('detalhes-turma-titulo').innerHTML = `${curso.nome} <span style="color:var(--text-muted); font-weight:400;">[${turma.identificador}]</span>`;
-        document.getElementById('detalhes-turma-subtitulo').innerHTML = `Instrutor: <strong style="color:var(--text-main);">${turma.instrutor}</strong> &nbsp;|&nbsp; ${turma.dia_semana} - ${turma.turno}`;
+        document.getElementById('detalhes-turma-titulo').innerHTML = `${escapeHtml(curso.nome)} <span style="color:var(--text-muted); font-weight:400;">[${escapeHtml(turma.identificador)}]</span>`;
+        document.getElementById('detalhes-turma-subtitulo').innerHTML = `Instrutor: <strong style="color:var(--text-main);">${escapeHtml(turma.instrutor)}</strong> &nbsp;|&nbsp; ${escapeHtml(turma.dia_semana)} - ${escapeHtml(turma.turno)}`;
 
         const isBloqueada = turma.matriculas_bloqueadas === true;
         const containerAcoes = document.getElementById('detalhes-turma-acoes');
         containerAcoes.innerHTML = `
-            <button class="btn ${!isBloqueada ? 'btn-outline' : 'btn-secondary'} btn-sm admin-only" onclick="alternarMatriculasTurmaDetalhe('${turma.id}', ${isBloqueada})">${!isBloqueada ? '🔒 Bloquear Matrículas' : '🔓 Liberar Matrículas'}</button>
-            <button class="btn btn-outline btn-sm" onclick="imprimirDiario('${curso.nome}', '${turma.identificador}', '${turma.instrutor}', '${turma.turno}', '${turma.dia_semana}')">🖨️ Imprimir Diário</button>
-            <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${turma.id}', '${curso.nome}', '${turma.identificador}', '${turma.dia_semana}', '${turma.turno}', '${turma.instrutor}', ${turma.vagas_limite}, '${turma.data_inicio || ''}', '${turma.data_fim || ''}')">✏️ Editar Turma</button>
-            <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurmaDetalhe('${turma.id}', 'Inativo')">🗑️ Desativar Turma</button>
+            <button class="btn ${!isBloqueada ? 'btn-outline' : 'btn-secondary'} btn-sm admin-only" onclick="alternarMatriculasTurmaDetalhe('${escapeJsParam(turma.id)}', ${isBloqueada})">${!isBloqueada ? '🔒 Bloquear Matrículas' : '🔓 Liberar Matrículas'}</button>
+            <button class="btn btn-outline btn-sm" onclick="imprimirDiario('${escapeJsParam(curso.nome)}', '${escapeJsParam(turma.identificador)}', '${escapeJsParam(turma.instrutor)}', '${escapeJsParam(turma.turno)}', '${escapeJsParam(turma.dia_semana)}')">🖨️ Imprimir Diário</button>
+            <button class="btn btn-warning btn-sm admin-only" onclick="prepararEdicaoTurma('${escapeJsParam(turma.id)}', '${escapeJsParam(curso.nome)}', '${escapeJsParam(turma.identificador)}', '${escapeJsParam(turma.dia_semana)}', '${escapeJsParam(turma.turno)}', '${escapeJsParam(turma.instrutor)}', ${turma.vagas_limite}, '${escapeJsParam(turma.data_inicio || '')}', '${escapeJsParam(turma.data_fim || '')}')">✏️ Editar Turma</button>
+            <button class="btn btn-danger btn-sm admin-only" onclick="alterarStatusTurmaDetalhe('${escapeJsParam(turma.id)}', 'Inativo')">🗑️ Desativar Turma</button>
         `;
 
         gerenciarAlunosTurmaMemoria(curso.nome, turma.identificador);
         gerenciarListaEsperaMemoria(curso.nome);
+        gerenciarListaDesistentesMemoria(curso.nome);
     }
 
     function gerenciarAlunosTurmaMemoria(cursoNome, identificadorTurma) {
@@ -1141,13 +1389,13 @@
             const badgeInativo = isInativo ? ` <span class="badge badge-excedida" style="margin-left:6px;">(Desistente)</span>` : '';
 
             const acaoHtml = temPermissaoMutacao 
-                ? `<button class="btn btn-outline btn-sm" style="padding: 3px 8px; margin-right: 4px;" onclick="alternarStatusAlunoTurma('${aluno.cpf}', ${isInativo})">${isInativo ? 'Ativar' : 'Inativar'}</button>
-                   <button class="btn btn-danger btn-sm" style="padding: 3px 8px;" onclick="desvincularAlunoTurma('${aluno.cpf}')">Desvincular</button>`
+                ? `<button class="btn btn-outline btn-sm" style="padding: 3px 8px; margin-right: 4px;" onclick="alternarStatusAlunoTurma('${escapeJsParam(aluno.cpf)}', ${isInativo})">${isInativo ? 'Ativar' : 'Inativar'}</button>
+                   <button class="btn btn-danger btn-sm" style="padding: 3px 8px;" onclick="desvincularAlunoTurma('${escapeJsParam(aluno.cpf)}')">Desvincular</button>`
                 : `<span style="color:var(--text-muted); font-size:0.8rem;">Apenas Leitura</span>`;
 
             tbody.innerHTML += `<tr>
-                <td><strong>${aluno.nome}</strong>${badgeInativo}</td>
-                <td style="color: var(--text-muted);">${aluno.cpf}</td>
+                <td><strong>${escapeHtml(aluno.nome)}</strong>${badgeInativo}</td>
+                <td style="color: var(--text-muted);">${escapeHtml(aluno.cpf)}</td>
                 <td style="text-align:center; white-space:nowrap;">${acaoHtml}</td>
             </tr>`;
         });
@@ -1155,7 +1403,7 @@
 
     function gerenciarListaEsperaMemoria(cursoNome) {
         document.getElementById('titulo-lista-espera').innerText = `📋 Lista de Espera: ${cursoNome}`;
-        document.getElementById('btn-imprimir-espera').setAttribute('onclick', `imprimirListaEspera('${cursoNome}')`);
+        document.getElementById('btn-imprimir-espera').onclick = () => imprimirListaEspera(cursoNome);
 
         const tbody = document.getElementById('tbody-lista-espera');
         const stringEspera = `${cursoNome} [Pendente/Lista de Espera]`;
@@ -1167,41 +1415,60 @@
         }
 
         alunosNaEspera.sort((a, b) => {
-            let dataA = new Date(0), dataB = new Date(0);
-            if (a.data_cadastro && a.data_cadastro.includes('/')) {
-                const [dia, mes, ano] = a.data_cadastro.split('/'); dataA = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-            }
-            if (b.data_cadastro && b.data_cadastro.includes('/')) {
-                const [dia, mes, ano] = b.data_cadastro.split('/'); dataB = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-            }
-            return dataA - dataB;
+            return parseDataCadastro(a.data_cadastro) - parseDataCadastro(b.data_cadastro);
         });
 
         const turmasDoCurso = turmasMemoria.filter(t => t.curso_nome === cursoNome);
         let opcoesTurma = '<option value="">Selecione a Turma...</option>';
         turmasDoCurso.forEach(t => {
             const statusText = t.matriculas_bloqueadas ? ' (Matrículas Bloqueadas)' : '';
-            opcoesTurma += `<option value="${t.identificador}">${t.identificador}${statusText}</option>`;
+            opcoesTurma += `<option value="${escapeHtml(t.identificador)}">${escapeHtml(t.identificador)}${statusText}</option>`;
         });
 
         tbody.innerHTML = '';
         alunosNaEspera.forEach(aluno => {
+            const idSelect = `turma-destino-${aluno.cpf.replace(/\D/g, '')}`;
             tbody.innerHTML += `<tr>
-                <td><strong>${aluno.nome}</strong></td>
-                <td style="color: var(--text-muted);">${aluno.cpf}</td>
+                <td><strong>${escapeHtml(aluno.nome)}</strong></td>
+                <td style="color: var(--text-muted);">${escapeHtml(aluno.cpf)}</td>
                 <td>
-                    <select class="operacional-only" id="turma-destino-${aluno.cpf}" style="padding: 6px 10px; border-radius: 6px;">${opcoesTurma}</select>
+                    <select class="operacional-only" id="${idSelect}" style="padding: 6px 10px; border-radius: 6px;">${opcoesTurma}</select>
                 </td>
                 <td style="text-align:center;">
-                    <button class="btn btn-secondary btn-sm operacional-only" onclick="promoverAlunoEspera('${aluno.cpf}', '${cursoNome}')">Tornar Titular</button>
+                    <button class="btn btn-secondary btn-sm operacional-only" onclick="promoverAlunoEspera('${escapeJsParam(aluno.cpf)}', '${escapeJsParam(cursoNome)}')">Tornar Titular</button>
                 </td>
+            </tr>`;
+        });
+    }
+
+    function gerenciarListaDesistentesMemoria(cursoNome) {
+        document.getElementById('titulo-lista-desistentes').innerText = `🚫 Alunos Desistentes: ${cursoNome}`;
+        document.getElementById('btn-imprimir-desistentes').onclick = () => imprimirListaDesistentes(cursoNome);
+
+        const tbody = document.getElementById('tbody-lista-desistentes');
+        const desistentes = obterDesistentesDoCurso(cursoNome);
+
+        if (desistentes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding: 24px 0;">Nenhum aluno desistente registrado para este curso.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        desistentes.forEach(d => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${escapeHtml(d.nome)}</strong></td>
+                <td style="color: var(--text-muted);">${escapeHtml(d.cpf)}</td>
+                <td>${escapeHtml(d.telefone)}</td>
+                <td><span class="badge badge-excedida">${escapeHtml(d.turma_origem)}</span></td>
             </tr>`;
         });
     }
 
     async function promoverAlunoEspera(cpf, cursoNome) {
         if (!verificarPermissaoEscrita()) return;
-        const select = document.getElementById(`turma-destino-${cpf}`);
+        const idLimpo = cpf.replace(/\D/g, '');
+        const select = document.getElementById(`turma-destino-${idLimpo}`) || document.getElementById(`turma-destino-${cpf}`);
+        if(!select) { alert("Elemento de seleção de turma não localizado."); return; }
         const identificadorTurma = select.value;
         if(!identificadorTurma) { alert("Selecione a turma de destino para este aluno."); return; }
 
@@ -1375,15 +1642,14 @@
         }
 
         alunosNaEspera.sort((a, b) => {
-            let dataA = new Date(0), dataB = new Date(0);
-            if (a.data_cadastro && a.data_cadastro.includes('/')) {
-                const [dia, mes, ano] = a.data_cadastro.split('/'); dataA = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-            }
-            if (b.data_cadastro && b.data_cadastro.includes('/')) {
-                const [dia, mes, ano] = b.data_cadastro.split('/'); dataB = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-            }
-            return dataA - dataB;
+            return parseDataCadastro(a.data_cadastro) - parseDataCadastro(b.data_cadastro);
         });
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("O bloqueador de pop-ups impediu a abertura da impressão. Por favor, autorize pop-ups para esta página.");
+            return;
+        }
 
         let tbodyHtml = '';
         alunosNaEspera.forEach((aluno, index) => {
@@ -1394,22 +1660,21 @@
             tbodyHtml += `
                 <tr>
                     <td style="text-align: center;">${index + 1}</td>
-                    <td><strong>${aluno.nome}</strong></td>
-                    <td>${tel}</td>
-                    <td>${email}</td>
-                    <td style="text-align: center;">${dataCad}</td>
+                    <td><strong>${escapeHtml(aluno.nome)}</strong></td>
+                    <td>${escapeHtml(tel)}</td>
+                    <td>${escapeHtml(email)}</td>
+                    <td style="text-align: center;">${escapeHtml(dataCad)}</td>
                     <td></td>
                 </tr>
             `;
         });
 
-        const printWindow = window.open('', '_blank');
         const htmlContent = `
         <!DOCTYPE html>
         <html lang="pt-BR">
         <head>
             <meta charset="UTF-8">
-            <title>Lista de Espera - ${cursoNome}</title>
+            <title>Lista de Espera - ${escapeHtml(cursoNome)}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; color: #333; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10pt; }
@@ -1419,7 +1684,7 @@
             </style>
         </head>
         <body>
-            <h3 style="text-align: center; margin-bottom: 20px; font-weight: bold;">📋 LISTA DE ESPERA - ${cursoNome}</h3>
+            <h3 style="text-align: center; margin-bottom: 20px; font-weight: bold;">📋 LISTA DE ESPERA - ${escapeHtml(cursoNome)}</h3>
             <table>
                 <thead>
                     <tr>
@@ -1436,11 +1701,86 @@
             <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
         </body>
         </html>`;
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    }
+
+    function imprimirListaDesistentes(cursoNome) {
+        const desistentes = obterDesistentesDoCurso(cursoNome);
+
+        if (desistentes.length === 0) {
+            alert("A lista de desistentes para este curso está vazia.");
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("O bloqueador de pop-ups impediu a abertura da impressão. Por favor, autorize pop-ups para esta página.");
+            return;
+        }
+
+        let tbodyHtml = '';
+        desistentes.forEach((aluno, index) => {
+            tbodyHtml += `
+                <tr>
+                    <td style="text-align: center;">${index + 1}</td>
+                    <td><strong>${escapeHtml(aluno.nome)}</strong></td>
+                    <td>${escapeHtml(aluno.cpf)}</td>
+                    <td>${escapeHtml(aluno.telefone)}</td>
+                    <td>${escapeHtml(aluno.turma_origem)}</td>
+                    <td></td>
+                </tr>
+            `;
+        });
+
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <title>Lista de Desistentes - ${escapeHtml(cursoNome)}</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10pt; }
+                th, td { border: 1px solid #000; padding: 8px 10px; text-align: left; }
+                th { background-color: #fee2e2; text-transform: uppercase; font-size: 10pt; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <h3 style="text-align: center; margin-bottom: 20px; font-weight: bold;">🚫 LISTA DE DESISTENTES - ${escapeHtml(cursoNome)}</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 4%; text-align: center;">Nº</th>
+                        <th style="width: 28%;">Nome do Aluno</th>
+                        <th style="width: 15%;">CPF</th>
+                        <th style="width: 15%;">Telefone</th>
+                        <th style="width: 20%;">Turma de Origem</th>
+                        <th style="width: 18%;">Observações</th>
+                    </tr>
+                </thead>
+                <tbody>${tbodyHtml}</tbody>
+            </table>
+            <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
+        </body>
+        </html>`;
+        printWindow.document.open();
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     }
 
     async function imprimirDiario(cursoNome, identificadorTurma, instrutor, turno, dia) {
+        // Abre o pop-up síncronamente no clique do usuário para evitar bloqueio pelo navegador
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("O bloqueador de pop-ups impediu a abertura do diário de classe. Por favor, autorize pop-ups para este site.");
+            return;
+        }
+        printWindow.document.open();
+        printWindow.document.write('<p style="font-family:sans-serif; text-align:center; padding-top:40px; color:#555;">Carregando diário de classe para impressão...</p>');
+
         const stringBusca = `${cursoNome} [${identificadorTurma}]`;
         const { data: alunos, error } = await supa.from('alunos_ccp').select('nome, cursos').like('cursos', `%${stringBusca}%`).order('nome');
 
@@ -1453,7 +1793,7 @@
             });
             
             alunosFiltrados.forEach((aluno, index) => {
-                listaAlunosHtml += `<tr><td class="col-num">${index + 1}</td><td class="col-nome">${aluno.nome}</td>${Array.from({length: 31}).map(() => '<td class="col-dia"></td>').join('')}</tr>`;
+                listaAlunosHtml += `<tr><td class="col-num">${index + 1}</td><td class="col-nome">${escapeHtml(aluno.nome)}</td>${Array.from({length: 31}).map(() => '<td class="col-dia"></td>').join('')}</tr>`;
             });
             
             for (let i = alunosFiltrados.length; i < 20; i++) {
@@ -1470,13 +1810,12 @@
         const caminhoBase = caminhoCenario.substring(0, caminhoCenario.lastIndexOf('/') + 1);
         const urlLogo = caminhoBase + 'image_773d3e.png';
 
-        const printWindow = window.open('', '_blank');
         const htmlContent = `
         <!DOCTYPE html>
         <html lang="pt-BR">
         <head>
             <meta charset="UTF-8">
-            <title>Diário de Classe - ${cursoNome} - ${identificadorTurma}</title>
+            <title>Diário de Classe - ${escapeHtml(cursoNome)} - ${escapeHtml(identificadorTurma)}</title>
             <style>
                 body { font-family: 'Times New Roman', Times, serif; margin: 0; padding: 15px; font-size: 11pt; color: #000; }
                 .header-container { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
@@ -1500,11 +1839,11 @@
         <body>
             <div class="header-container"><img src="${urlLogo}" alt="Prefeitura de Iguaba Grande" class="logo-header"></div>
             <div class="info-bar">
-                <span>Instrutor: ${instrutor || '__________________________________'}</span>
-                <span>Disciplina: ${cursoNome}</span>
+                <span>Instrutor: ${escapeHtml(instrutor) || '__________________________________'}</span>
+                <span>Disciplina: ${escapeHtml(cursoNome)}</span>
                 <span>Mês/Ano: ${mesAno}</span>
-                <span>Turma: ${nomeTurmaLimpo}</span>
-                <span>Turno: ${turno}</span>
+                <span>Turma: ${escapeHtml(nomeTurmaLimpo)}</span>
+                <span>Turno: ${escapeHtml(turno)}</span>
             </div>
             <table>
                 <thead>
@@ -1519,12 +1858,12 @@
             <div class="header-container"><img src="${urlLogo}" alt="Prefeitura de Iguaba Grande" class="logo-header"></div>
             <div class="plan-header">Modelo Conciso de Planejamento Semanal</div>
             <div class="plan-info">
-                <span><strong>INSTRUTOR:</strong> ${instrutor || '________________________________________'}</span>
-                <span><strong>TURMA:</strong> ${nomeTurmaLimpo}</span>
+                <span><strong>INSTRUTOR:</strong> ${escapeHtml(instrutor) || '________________________________________'}</span>
+                <span><strong>TURMA:</strong> ${escapeHtml(nomeTurmaLimpo)}</span>
             </div>
             <div class="plan-info">
                 <span><strong>OBJETIVO:</strong> ______________________________________________________________</span>
-                <span><strong>TURNO:</strong> ${turno}</span>
+                <span><strong>TURNO:</strong> ${escapeHtml(turno)}</span>
             </div>
             <table class="plan-table">
                 <thead><tr><th style="width: 5%;">SEMANA</th><th style="width: 10%;">DATA (Início)</th><th style="width: 35%;">CONTEÚDO/TEMA</th><th style="width: 30%;">RECURSOS/ESTRATÉGIAS</th><th style="width: 20%;">AVALIAÇÃO</th></tr></thead>
@@ -1538,6 +1877,7 @@
             <script>window.onload = function() { setTimeout(() => { window.print(); }, 500); }<\/script>
         </body>
         </html>`;
+        printWindow.document.open();
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     }
