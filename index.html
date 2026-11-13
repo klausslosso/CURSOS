@@ -205,7 +205,8 @@
             background-color: rgba(255, 255, 255, 0.88) !important;
             border-bottom: 1px solid rgba(203, 213, 225, 0.85);
         }
-        html:not(.dark) .bg-surface-panel {
+        html:not(.dark) .bg-surface-panel,
+        html:not(.dark) [class*="bg-surface-panel"] {
             background-color: #ffffff !important;
             border: 1px solid #cbd5e1;
         }
@@ -213,7 +214,12 @@
             background-color: rgba(255, 255, 255, 0.86) !important;
             border: 1px solid #cbd5e1;
         }
-        html:not(.dark) .bg-surface-container-low {
+        html:not(.dark) main .bg-surface-panel\/70 {
+            background-color: #f1f5f9 !important;
+            border: 1px solid #cbd5e1;
+        }
+        html:not(.dark) .bg-surface-container-low,
+        html:not(.dark) .bg-surface-container-low\/80 {
             background-color: #f8fafc !important;
             border: 1px solid #e2e8f0;
         }
